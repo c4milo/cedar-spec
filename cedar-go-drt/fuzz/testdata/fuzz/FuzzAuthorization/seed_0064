@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("{\"policies\":[\"permit (\\n  principal in UserGroup::\\\"guardians\\\",\\n  action in [Action::\\\"view\\\"],\\n  resource == ScreenTime::\\\"activity\\\"\\n)\\nwhen { principal.account.age \\u003e= 18 };\\n\"],\"entities\":[],\"request\":{\"principal\":{\"type\":\"User\",\"id\":\"default\"},\"action\":{\"type\":\"Action\",\"id\":\"access\"},\"resource\":{\"type\":\"Resource\",\"id\":\"default\"},\"context\":{}}}")

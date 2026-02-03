@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("{\"policies\":[\"permit(principal, action, resource) when { context.ip.isInRange(ip(\\\"10.0.0.0/8\\\")) };\"],\"entities\":[],\"request\":{\"principal\":{\"type\":\"User\",\"id\":\"alice\"},\"action\":{\"type\":\"Action\",\"id\":\"view\"},\"resource\":{\"type\":\"Resource\",\"id\":\"doc\"},\"context\":{\"ip\":{\"__extn\":{\"fn\":\"ip\",\"arg\":\"10.1.2.3\"}}}}}")

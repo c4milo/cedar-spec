@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("{\"policies\":[\"permit(principal, action, resource in Folder::\\\"root\\\");\"],\"entities\":[{\"uid\":{\"type\":\"File\",\"id\":\"doc1\"},\"parents\":[{\"type\":\"Folder\",\"id\":\"root\"}],\"attrs\":{}},{\"uid\":{\"type\":\"Folder\",\"id\":\"root\"},\"parents\":[],\"attrs\":{}}],\"request\":{\"principal\":{\"type\":\"User\",\"id\":\"alice\"},\"action\":{\"type\":\"Action\",\"id\":\"view\"},\"resource\":{\"type\":\"File\",\"id\":\"doc1\"},\"context\":{}}}")

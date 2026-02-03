@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("batch\x1de9y9A!,7\x1cz\x132A\x13c\x13\x137a)8\x13%A\x13zd-1")

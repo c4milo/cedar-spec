@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("{\"schema\":\"entity Photo in [Album] { owner: User };\\nentity UserGroup;\\nentity Album in [Album];\\nentity User in [UserGroup];\\n\\naction edit, view appliesTo { principal: [User], resource: [Photo] };\\n\",\"policies\":[\"permit (\\n  principal == User::\\\"bob\\\",\\n  action == Action::\\\"view\\\",\\n  resource\\n)\\nwhen { action == Action::\\\"view\\\" };\\n\"]}")

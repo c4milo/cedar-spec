@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("{\"policies\":[\"permit(principal in Group::\\\"admins\\\", action, resource);\"],\"entities\":[{\"uid\":{\"type\":\"User\",\"id\":\"alice\"},\"parents\":[{\"type\":\"Group\",\"id\":\"admins\"}],\"attrs\":{}},{\"uid\":{\"type\":\"Group\",\"id\":\"admins\"},\"parents\":[],\"attrs\":{}}],\"request\":{\"principal\":{\"type\":\"User\",\"id\":\"alice\"},\"action\":{\"type\":\"Action\",\"id\":\"view\"},\"resource\":{\"type\":\"Resource\",\"id\":\"doc\"},\"context\":{}}}")

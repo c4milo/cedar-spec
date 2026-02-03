@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("{\"policies\":[\"permit(principal, action, resource) when { principal.tags.contains(\\\"vip\\\") };\"],\"entities\":[{\"uid\":{\"type\":\"User\",\"id\":\"alice\"},\"parents\":[],\"attrs\":{\"tags\":[\"vip\",\"premium\"]}}],\"request\":{\"principal\":{\"type\":\"User\",\"id\":\"alice\"},\"action\":{\"type\":\"Action\",\"id\":\"view\"},\"resource\":{\"type\":\"Resource\",\"id\":\"doc\"},\"context\":{}}}")

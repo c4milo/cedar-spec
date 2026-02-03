@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("{\"policies\":[\"// Template for permitting vacation photo access\\n@id(\\\"AccessVacation\\\")\\npermit (\\n  principal in ?principal,\\n  action == Action::\\\"view\\\",\\n  resource == Photo::\\\"VacationPhoto94.jpg\\\"\\n)\\nwhen { principal has department \\u0026\\u0026 principal.department == \\\"research\\\" };\\n\"],\"entities\":[],\"request\":{\"principal\":{\"type\":\"User\",\"id\":\"default\"},\"action\":{\"type\":\"Action\",\"id\":\"access\"},\"resource\":{\"type\":\"Resource\",\"id\":\"default\"},\"context\":{}}}")

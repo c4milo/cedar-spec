@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("{\"policies\":[\"permit(principal, action, resource) when { principal.profile[\\\"level\\\"] \\u003e 5 };\"],\"entities\":[{\"uid\":{\"type\":\"User\",\"id\":\"alice\"},\"parents\":[],\"attrs\":{\"profile\":{\"level\":10,\"name\":\"Alice\"}}}],\"request\":{\"principal\":{\"type\":\"User\",\"id\":\"alice\"},\"action\":{\"type\":\"Action\",\"id\":\"view\"},\"resource\":{\"type\":\"Resource\",\"id\":\"doc\"},\"context\":{}}}")

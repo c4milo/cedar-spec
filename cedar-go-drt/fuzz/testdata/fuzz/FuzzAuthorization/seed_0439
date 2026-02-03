@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("{\"policies\":[\"permit(principal, action, resource) unless { context.blocked };\"],\"entities\":[],\"request\":{\"principal\":{\"type\":\"User\",\"id\":\"alice\"},\"action\":{\"type\":\"Action\",\"id\":\"view\"},\"resource\":{\"type\":\"Resource\",\"id\":\"doc\"},\"context\":{\"blocked\":false}}}")

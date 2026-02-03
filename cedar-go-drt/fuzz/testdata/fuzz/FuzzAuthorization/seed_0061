@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("{\"policies\":[\"permit (\\n  principal == User::\\\"bob\\\",\\n  action in [Action::\\\"view\\\", Action::\\\"edit\\\"],\\n  resource in Album::\\\"jane_vacation\\\"\\n);\\n\"],\"entities\":[],\"request\":{\"principal\":{\"type\":\"User\",\"id\":\"default\"},\"action\":{\"type\":\"Action\",\"id\":\"access\"},\"resource\":{\"type\":\"Resource\",\"id\":\"default\"},\"context\":{}}}")

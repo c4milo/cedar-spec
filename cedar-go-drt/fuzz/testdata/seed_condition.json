@@ -1,0 +1,18 @@
+{
+  "policies": [
+    "permit(principal, action, resource) when { principal.role == \"admin\" };"
+  ],
+  "entities": [
+    {
+      "uid": {"type": "User", "id": "admin"},
+      "attrs": {"role": "admin"},
+      "parents": []
+    }
+  ],
+  "request": {
+    "principal": {"type": "User", "id": "admin"},
+    "action": {"type": "Action", "id": "delete"},
+    "resource": {"type": "Document", "id": "doc3"},
+    "context": {}
+  }
+}

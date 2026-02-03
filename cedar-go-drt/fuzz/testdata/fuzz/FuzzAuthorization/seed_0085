@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("{\"policies\":[\"permit(principal, action, resource) when {\\n  // 0\\n  if // 1\\n  true // 2\\n  then  // 3\\n  1 // 4\\n  else // 5\\n  2 // 6\\n};\\n\"],\"entities\":[],\"request\":{\"principal\":{\"type\":\"User\",\"id\":\"default\"},\"action\":{\"type\":\"Action\",\"id\":\"access\"},\"resource\":{\"type\":\"Resource\",\"id\":\"default\"},\"context\":{}}}")

@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("{\"policies\":[\"permit(principal, action, resource) when { principal has email \\u0026\\u0026 principal.email like \\\"*@example.com\\\" };\"],\"entities\":[{\"uid\":{\"type\":\"User\",\"id\":\"alice\"},\"parents\":[],\"attrs\":{\"email\":\"alice@example.com\"}}],\"request\":{\"principal\":{\"type\":\"User\",\"id\":\"alice\"},\"action\":{\"type\":\"Action\",\"id\":\"view\"},\"resource\":{\"type\":\"Resource\",\"id\":\"doc\"},\"context\":{}}}")

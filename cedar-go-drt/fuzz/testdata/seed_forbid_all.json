@@ -1,0 +1,10 @@
+{
+  "policies": ["forbid(principal, action, resource);"],
+  "entities": [],
+  "request": {
+    "principal": {"type": "User", "id": "bob"},
+    "action": {"type": "Action", "id": "edit"},
+    "resource": {"type": "Document", "id": "doc2"},
+    "context": {}
+  }
+}

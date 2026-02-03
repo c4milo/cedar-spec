@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("{\"schema\":\"entity Album in [Album];\\nentity User in [UserGroup] { score: __cedar::decimal };\\nentity UserGroup;\\nentity Photo in [Album] { owner: User };\\n\\naction edit, view appliesTo { principal: [User], resource: [Photo] };\\n\",\"policies\":[\"permit (\\n  principal == User::\\\"bob\\\",\\n  action == Action::\\\"view\\\",\\n  resource\\n)\\nwhen\\n{\\n  principal == resource.owner \\u0026\\u0026\\n  principal.score.greaterThanOrEqual(decimal(\\\"0.75\\\"))\\n};\\n\"]}")
