@@ -102,7 +102,15 @@ Compares cedar-go vs Lean results:
 - `CompareValidation()` - Valid/invalid with error messages
 - `CheckTypeSoundness()` - If cedar-go accepts, Lean must too
 
-## Fuzz Targets (51 total)
+## Fuzz Targets (57 total)
+
+### Authorization Theorems (No Lean Required) ⚡
+Property-based tests verifying Lean authorization theorems:
+| Make Target | Purpose |
+|-------------|---------|
+| `fuzz-forbid-trumps` | `forbid_trumps_permit` - forbid always overrides permit |
+| `fuzz-default-deny` | `default_deny` - deny if no permit satisfied |
+| `fuzz-order-dup` | `order_and_dup_independent` - order/duplicates don't affect result |
 
 ### Authorization (Lean Required)
 | Make Target | Purpose |
@@ -152,9 +160,12 @@ Compares cedar-go vs Lean results:
 | `fuzz-policy-cedar-to-json` | Cedar→JSON conversion |
 | `fuzz-policy-json-to-cedar` | JSON→Cedar conversion |
 
-### TPE/Partial Evaluation
+### TPE/Partial Evaluation (Lean Required for DRT)
 | Make Target | Purpose |
 |-------------|---------|
+| `fuzz-tpe-drt` | TPE DRT - compares cedar-go batch vs Lean TPE |
+| `fuzz-tpe-soundness` | TPE soundness - batch matches full evaluation |
+| `fuzz-tpe-reauth` | TPE reauthorize - partial + full must match |
 | `fuzz-tpe-query-principal` | Batch with variable principal |
 | `fuzz-tpe-query-resource` | Batch with variable resource |
 | `fuzz-tpe-query-action` | Batch with variable action |
@@ -241,13 +252,19 @@ The **strict validation mode** (`fuzz-val-strict`) catches:
 
 ## Key Properties Tested
 
-1. **Soundness**: Partial evaluation preserves authorization decisions
-2. **Type Soundness**: If cedar-go validates, Lean must validate
-3. **Strict Agreement**: cedar-go and Lean agree on all validation outcomes
-4. **Consistency**: Batch results match individual authorization
-5. **Determinism**: Same input → same output
-6. **Equivalence**: Format conversions preserve semantics
-7. **Correctness**: Forbid trumps permit
+### Lean Authorization Theorems
+1. **forbid_trumps_permit**: If a forbid policy is satisfied, decision = deny
+2. **default_deny**: If no permit policy is satisfied, decision = deny
+3. **order_and_dup_independent**: Authorization is independent of policy order/duplicates
+
+### DRT Properties
+4. **Soundness**: Partial evaluation preserves authorization decisions
+5. **Type Soundness**: If cedar-go validates, Lean must validate
+6. **Strict Agreement**: cedar-go and Lean agree on all validation outcomes
+7. **Consistency**: Batch results match individual authorization
+8. **Determinism**: Same input → same output
+9. **Equivalence**: Format conversions preserve semantics
+10. **TPE Soundness**: TPE partial evaluation matches full evaluation
 
 ## Environment Variables (Auto-configured by Makefile)
 

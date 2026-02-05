@@ -52,7 +52,7 @@ else
     DYLIB_PATH_VAR := LD_LIBRARY_PATH
 endif
 
-.PHONY: all lean proto build test test-fuzz lint deadcode fmt fuzz-auth fuzz-val fuzz-val-strict fuzz-eval fuzz-eval-td fuzz-entity-val fuzz-request-val fuzz-level-val fuzz-auth-td fuzz-val-td fuzz-batch fuzz-batch-drt fuzz-roundtrip fuzz-proto-roundtrip fuzz-rbac fuzz-rbac-authorizer fuzz-val-pbt fuzz-val-pbt-td fuzz-wildcard fuzz-partial-eval fuzz-partial-eval-pbt fuzz-policy-cedar-to-json fuzz-policy-json-to-cedar fuzz-tpe-query-principal fuzz-tpe-query-resource fuzz-tpe-query-action fuzz-entity-slicing fuzz-schema-resolution fuzz-input-generation fuzz-parser-crash fuzz-schema-parser fuzz-schema-wf fuzz-schema-wf-td corpus corpus-from-drt corpus-full corpus-expanded corpus-validation corpus-validation-expanded clean help
+.PHONY: all lean proto build test test-fuzz lint deadcode fmt fuzz-auth fuzz-val fuzz-val-strict fuzz-eval fuzz-eval-td fuzz-entity-val fuzz-request-val fuzz-level-val fuzz-auth-td fuzz-val-td fuzz-batch fuzz-batch-drt fuzz-roundtrip fuzz-proto-roundtrip fuzz-rbac fuzz-rbac-authorizer fuzz-val-pbt fuzz-val-pbt-td fuzz-wildcard fuzz-partial-eval fuzz-partial-eval-pbt fuzz-policy-cedar-to-json fuzz-policy-json-to-cedar fuzz-tpe-query-principal fuzz-tpe-query-resource fuzz-tpe-query-action fuzz-entity-slicing fuzz-schema-resolution fuzz-input-generation fuzz-parser-crash fuzz-schema-parser fuzz-schema-wf fuzz-schema-wf-td fuzz-forbid-trumps fuzz-default-deny fuzz-order-dup fuzz-tpe-drt fuzz-tpe-soundness fuzz-tpe-reauth corpus corpus-from-drt corpus-full corpus-expanded corpus-validation corpus-validation-expanded clean help
 
 all: proto build
 
@@ -473,6 +473,53 @@ fuzz-schema-wf-td: proto
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
 	go test -fuzz=FuzzSchemaWellFormednessTypeDirected -fuzztime=5m ./fuzz/
+
+## fuzz-forbid-trumps: Run forbid_trumps_permit theorem fuzzing (property-based)
+## Tests that if a forbid policy is satisfied, the decision must be deny
+fuzz-forbid-trumps: proto
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	go test -fuzz=FuzzForbidTrumpsPermit -fuzztime=2m ./fuzz/
+
+## fuzz-default-deny: Run default_deny theorem fuzzing (property-based)
+## Tests that if no permit policy is satisfied, the decision must be deny
+fuzz-default-deny: proto
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	go test -fuzz=FuzzDefaultDeny -fuzztime=2m ./fuzz/
+
+## fuzz-order-dup: Run order_and_dup_independent theorem fuzzing (property-based)
+## Tests that authorization is independent of policy order and duplicates
+fuzz-order-dup: proto
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	go test -fuzz=FuzzOrderAndDupIndependent -fuzztime=2m ./fuzz/
+
+## fuzz-tpe-drt: Run TPE DRT (compares cedar-go batch evaluation against Lean TPE)
+fuzz-tpe-drt: proto
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	go test -fuzz='^FuzzTPEDRT$$' -fuzztime=5m ./fuzz/
+
+## fuzz-tpe-soundness: Run TPE soundness fuzzing (batch result matches full evaluation)
+fuzz-tpe-soundness: proto
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	go test -fuzz=FuzzTPESoundness -fuzztime=5m ./fuzz/
+
+## fuzz-tpe-reauth: Run TPE reauthorize fuzzing (partial eval + full eval must match)
+fuzz-tpe-reauth: proto
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	go test -fuzz=FuzzTPEResidualReauthorize -fuzztime=5m ./fuzz/
 
 ## run-drt: Run manual DRT test via CLI
 run-drt: proto build
