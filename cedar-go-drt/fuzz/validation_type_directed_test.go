@@ -18,6 +18,7 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/cedar-policy/cedar-go"
 	"github.com/cedar-policy/cedar-go/x/exp/schema"
 	"github.com/cedar-policy/cedar-go/x/exp/validator"
 
@@ -30,7 +31,6 @@ import (
 // FuzzValidationTypeDirected is a type-directed fuzz target for validation.
 // It generates well-typed schemas and policies for validation testing.
 func FuzzValidationTypeDirected(f *testing.F) {
-	// Add seeds
 	f.Add([]byte("validation-seed"))
 	f.Add([]byte("type-directed-validation"))
 	f.Add(make([]byte, 64))
@@ -47,60 +47,63 @@ func FuzzValidationTypeDirected(f *testing.F) {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
 
-		// Generate type-directed input
 		input, err := inputGen.GenerateForValidation(data)
 		if err != nil {
 			return
 		}
 
-		// Parse the schema for cedar-go validator
 		s, schemaErr := schema.NewFromJSON(input.SchemaJSON)
 		if schemaErr != nil {
-			return // Schema parse error, skip
-		}
-
-		// Run cedar-go validation
-		goValidationResult := validator.ValidatePolicies(s, input.Policies)
-		goResult := &comparison.ValidationResult{
-			Valid: goValidationResult.Valid,
-		}
-		for _, verr := range goValidationResult.Errors {
-			goResult.Errors = append(goResult.Errors, verr.Message)
-		}
-
-		// Run Lean validation
-		leanResp := runTypeDirectedLeanValidation(t, input)
-		if leanResp == nil {
 			return
 		}
 
-		leanResult := &comparison.ValidationResult{
-			Valid:  leanResp.Valid,
-			Errors: []string{leanResp.Errors},
+		goResult := runTypeDirectedGoValidation(s, input.Policies)
+		leanResult := buildTypeDirectedLeanResult(t, input)
+		if leanResult == nil {
+			return
 		}
 
-		// Compare results
-		diffs := comparison.CompareValidation(goResult, leanResult, config)
-		if len(diffs) > 0 {
-			// Log the policy for debugging
-			var policyStrings []string
-			for _, p := range input.Policies.All() {
-				policyStrings = append(policyStrings, string(p.MarshalCedar()))
-			}
-			t.Errorf("Type-directed validation divergence:\n%s\nSchema: %s\nPolicies: %v",
-				comparison.FormatValidationDifferences(diffs), string(input.SchemaJSON), policyStrings)
-		}
-
-		// Type soundness check
-		if err := comparison.CheckTypeSoundness(goResult, leanResult); err != nil {
-			// Log the policy for debugging
-			var policyStrings []string
-			for _, p := range input.Policies.All() {
-				policyStrings = append(policyStrings, string(p.MarshalCedar()))
-			}
-			t.Errorf("Type soundness violation: %v\nSchema: %s\nPolicies: %v", err, string(input.SchemaJSON), policyStrings)
-		}
+		reportTypeDirectedDiffs(t, goResult, leanResult, input, config)
 	})
+}
+
+func runTypeDirectedGoValidation(s *schema.Schema, policies *cedar.PolicySet) *comparison.ValidationResult {
+	goValidationResult := validator.ValidatePolicies(s, policies)
+	result := &comparison.ValidationResult{Valid: goValidationResult.Valid}
+	for _, verr := range goValidationResult.Errors {
+		result.Errors = append(result.Errors, verr.Message)
+	}
+	return result
+}
+
+func buildTypeDirectedLeanResult(t *testing.T, input *typegen.TypeDirectedInput) *comparison.ValidationResult {
+	leanResp := runTypeDirectedLeanValidation(t, input)
+	if leanResp == nil {
+		return nil
+	}
+	return &comparison.ValidationResult{Valid: leanResp.Valid, Errors: []string{leanResp.Errors}}
+}
+
+func reportTypeDirectedDiffs(t *testing.T, goResult, leanResult *comparison.ValidationResult, input *typegen.TypeDirectedInput, config comparison.ComparisonConfig) {
+	t.Helper()
+	diffs := comparison.CompareValidation(goResult, leanResult, config)
+	if len(diffs) > 0 {
+		policyStrings := marshalPoliciesForLog(input.Policies)
+		t.Errorf("Type-directed validation divergence:\n%s\nSchema: %s\nPolicies: %v",
+			comparison.FormatValidationDifferences(diffs), string(input.SchemaJSON), policyStrings)
+	}
+	if err := comparison.CheckTypeSoundness(goResult, leanResult); err != nil {
+		policyStrings := marshalPoliciesForLog(input.Policies)
+		t.Errorf("Type soundness violation: %v\nSchema: %s\nPolicies: %v", err, string(input.SchemaJSON), policyStrings)
+	}
+}
+
+func marshalPoliciesForLog(policies *cedar.PolicySet) []string {
+	var result []string
+	for _, p := range policies.All() {
+		result = append(result, string(p.MarshalCedar()))
+	}
+	return result
 }
 
 func runTypeDirectedLeanValidation(t *testing.T, input *typegen.TypeDirectedInput) *lean.ValidationResponse {

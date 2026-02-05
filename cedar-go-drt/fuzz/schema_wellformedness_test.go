@@ -481,35 +481,54 @@ func checkFieldCasingRecursive(data []byte, correctFields map[string]bool) bool 
 	}
 
 	for key, value := range raw {
-		// Check if this key looks like a schema field but has wrong casing
-		keyLower := strings.ToLower(key)
-		for correct := range correctFields {
-			if strings.ToLower(correct) == keyLower && correct != key {
-				return true
-			}
+		if hasIncorrectCasing(key, correctFields) {
+			return true
 		}
-
-		// Recurse into nested objects
-		if len(value) > 0 && value[0] == '{' {
-			if checkFieldCasingRecursive(value, correctFields) {
-				return true
-			}
-		}
-
-		// Recurse into arrays
-		if len(value) > 0 && value[0] == '[' {
-			var arr []json.RawMessage
-			if err := json.Unmarshal(value, &arr); err == nil {
-				for _, item := range arr {
-					if len(item) > 0 && item[0] == '{' {
-						if checkFieldCasingRecursive(item, correctFields) {
-							return true
-						}
-					}
-				}
-			}
+		if checkNestedValue(value, correctFields) {
+			return true
 		}
 	}
 
+	return false
+}
+
+// hasIncorrectCasing checks if a key has incorrect casing compared to known correct fields.
+func hasIncorrectCasing(key string, correctFields map[string]bool) bool {
+	keyLower := strings.ToLower(key)
+	for correct := range correctFields {
+		if strings.ToLower(correct) == keyLower && correct != key {
+			return true
+		}
+	}
+	return false
+}
+
+// checkNestedValue checks nested objects and arrays for incorrect field casing.
+func checkNestedValue(value json.RawMessage, correctFields map[string]bool) bool {
+	if len(value) == 0 {
+		return false
+	}
+	if value[0] == '{' {
+		return checkFieldCasingRecursive(value, correctFields)
+	}
+	if value[0] == '[' {
+		return checkArrayItems(value, correctFields)
+	}
+	return false
+}
+
+// checkArrayItems checks array items for incorrect field casing.
+func checkArrayItems(value json.RawMessage, correctFields map[string]bool) bool {
+	var arr []json.RawMessage
+	if err := json.Unmarshal(value, &arr); err != nil {
+		return false
+	}
+	for _, item := range arr {
+		if len(item) > 0 && item[0] == '{' {
+			if checkFieldCasingRecursive(item, correctFields) {
+				return true
+			}
+		}
+	}
 	return false
 }
