@@ -52,7 +52,7 @@ else
     DYLIB_PATH_VAR := LD_LIBRARY_PATH
 endif
 
-.PHONY: all lean proto build test test-fuzz lint deadcode fmt fuzz-auth fuzz-val fuzz-val-strict fuzz-eval fuzz-eval-td fuzz-entity-val fuzz-request-val fuzz-level-val fuzz-auth-td fuzz-val-td fuzz-batch fuzz-batch-drt fuzz-roundtrip fuzz-proto-roundtrip fuzz-rbac fuzz-rbac-authorizer fuzz-val-pbt fuzz-val-pbt-td fuzz-wildcard fuzz-partial-eval fuzz-partial-eval-pbt fuzz-policy-cedar-to-json fuzz-policy-json-to-cedar fuzz-tpe-query-principal fuzz-tpe-query-resource fuzz-tpe-query-action fuzz-entity-slicing fuzz-schema-resolution fuzz-input-generation corpus corpus-from-drt corpus-full corpus-expanded corpus-validation corpus-validation-expanded clean help
+.PHONY: all lean proto build test test-fuzz lint deadcode fmt fuzz-auth fuzz-val fuzz-val-strict fuzz-eval fuzz-eval-td fuzz-entity-val fuzz-request-val fuzz-level-val fuzz-auth-td fuzz-val-td fuzz-batch fuzz-batch-drt fuzz-roundtrip fuzz-proto-roundtrip fuzz-rbac fuzz-rbac-authorizer fuzz-val-pbt fuzz-val-pbt-td fuzz-wildcard fuzz-partial-eval fuzz-partial-eval-pbt fuzz-policy-cedar-to-json fuzz-policy-json-to-cedar fuzz-tpe-query-principal fuzz-tpe-query-resource fuzz-tpe-query-action fuzz-entity-slicing fuzz-schema-resolution fuzz-input-generation fuzz-parser-crash fuzz-schema-parser fuzz-schema-wf fuzz-schema-wf-td corpus corpus-from-drt corpus-full corpus-expanded corpus-validation corpus-validation-expanded clean help
 
 all: proto build
 
@@ -263,14 +263,26 @@ fuzz-val-td: proto
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
 	go test -fuzz=FuzzValidationTypeDirected -fuzztime=5m ./fuzz/
 
-## fuzz-batch: Run batched evaluation fuzzing (property-based, no Lean)
-fuzz-batch:
+## fuzz-batch: Run batched evaluation fuzzing (property-based, no Lean FFI calls but needs CGO for build)
+fuzz-batch: proto
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	go test -fuzz=FuzzBatchedEvaluation -fuzztime=5m ./fuzz/
 
-## fuzz-roundtrip: Run roundtrip fuzzing (pure Go, no Lean)
-fuzz-roundtrip:
+## fuzz-roundtrip: Run roundtrip fuzzing (no Lean FFI calls but needs CGO for build)
+fuzz-roundtrip: proto
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	go test -fuzz=FuzzPolicyRoundtrip -fuzztime=2m ./fuzz/
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	go test -fuzz=FuzzSchemaRoundtrip -fuzztime=2m ./fuzz/
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	go test -fuzz=FuzzPolicySetRoundtrip -fuzztime=2m ./fuzz/
 
 ## fuzz-rbac: Run RBAC role hierarchy fuzzing
@@ -321,8 +333,11 @@ fuzz-val-pbt-td: proto
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
 	go test -fuzz=FuzzValidationPBTTypeDirected -fuzztime=5m ./fuzz/
 
-## fuzz-wildcard: Run wildcard pattern matching fuzzing (pure Go, no Lean)
-fuzz-wildcard:
+## fuzz-wildcard: Run wildcard pattern matching fuzzing (no Lean FFI calls but needs CGO for build)
+fuzz-wildcard: proto
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	go test -fuzz=FuzzWildcardMatching -fuzztime=2m ./fuzz/
 
 ## fuzz-partial-eval: Run partial evaluation soundness fuzzing
@@ -357,12 +372,18 @@ fuzz-residual-set-drt: proto
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
 	go test -fuzz=FuzzResidualSetDRT -fuzztime=5m ./fuzz/
 
-## fuzz-policy-cedar-to-json: Run policy Cedar->JSON conversion fuzzing (pure Go)
-fuzz-policy-cedar-to-json:
+## fuzz-policy-cedar-to-json: Run policy Cedar->JSON conversion fuzzing (no Lean FFI calls but needs CGO for build)
+fuzz-policy-cedar-to-json: proto
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	go test -fuzz=FuzzPolicyCedarToJSON -fuzztime=2m ./fuzz/
 
-## fuzz-policy-json-to-cedar: Run policy JSON->Cedar conversion fuzzing (pure Go)
-fuzz-policy-json-to-cedar:
+## fuzz-policy-json-to-cedar: Run policy JSON->Cedar conversion fuzzing (no Lean FFI calls but needs CGO for build)
+fuzz-policy-json-to-cedar: proto
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	go test -fuzz=FuzzPolicyJSONToCedar -fuzztime=2m ./fuzz/
 
 ## fuzz-tpe-query-principal: Run TPE principal query fuzzing
@@ -412,6 +433,46 @@ fuzz-input-generation: proto
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
 	go test -fuzz='FuzzInputGeneration$$' -fuzztime=5m ./fuzz/
+
+## fuzz-parser-crash: Run parser crash testing (no Lean FFI calls, but needs CGO for build)
+## Tests that parsers don't panic on arbitrary/malformed input
+fuzz-parser-crash: proto
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	go test -fuzz=FuzzPolicyParserCrash -fuzztime=2m ./fuzz/
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	go test -fuzz=FuzzSchemaParser -fuzztime=2m ./fuzz/
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	go test -fuzz=FuzzEntityUIDParser -fuzztime=2m ./fuzz/
+
+## fuzz-schema-parser: Run schema parser crash testing (no Lean FFI calls, but needs CGO for build)
+fuzz-schema-parser: proto
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	go test -fuzz=FuzzSchemaParser -fuzztime=2m ./fuzz/
+
+## fuzz-schema-wf: Run schema well-formedness DRT (compares cedar-go against Lean)
+## Tests that both implementations agree on what constitutes a well-formed schema
+fuzz-schema-wf: proto
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	go test -fuzz='FuzzSchemaWellFormedness$$' -fuzztime=5m ./fuzz/
+
+## fuzz-schema-wf-td: Run type-directed schema well-formedness DRT
+fuzz-schema-wf-td: proto
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	go test -fuzz=FuzzSchemaWellFormednessTypeDirected -fuzztime=5m ./fuzz/
 
 ## run-drt: Run manual DRT test via CLI
 run-drt: proto build

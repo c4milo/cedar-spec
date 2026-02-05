@@ -39,8 +39,8 @@ func parseRequestValidationInput(data []byte) (*schema.Schema, cedar.Request, er
 		return nil, cedar.Request{}, err
 	}
 
-	var s schema.Schema
-	if err := s.UnmarshalJSON([]byte(input.Schema)); err != nil {
+	s, err := schema.NewFromJSON([]byte(input.Schema))
+	if err != nil {
 		return nil, cedar.Request{}, err
 	}
 
@@ -49,7 +49,7 @@ func parseRequestValidationInput(data []byte) (*schema.Schema, cedar.Request, er
 		return nil, cedar.Request{}, err
 	}
 
-	return &s, request, nil
+	return s, request, nil
 }
 
 // runLeanRequestValidation runs Lean request validation and returns the result.
@@ -169,8 +169,7 @@ func TestRequestValidationBasic(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			var s schema.Schema
-			err := s.UnmarshalJSON([]byte(tc.schema))
+			_, err := schema.NewFromJSON([]byte(tc.schema))
 			if (err == nil) != tc.expectParse {
 				t.Errorf("Schema parse: expected success=%v, got error=%v", tc.expectParse, err)
 			}

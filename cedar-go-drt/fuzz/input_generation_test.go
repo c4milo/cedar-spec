@@ -131,12 +131,12 @@ func validateSchemaConformance(t *testing.T, input *typegen.TypeDirectedInput) {
 		return
 	}
 
-	var s schema.Schema
-	if err := s.UnmarshalJSON(input.SchemaJSON); err != nil {
+	s, schemaErr := schema.NewFromJSON(input.SchemaJSON)
+	if schemaErr != nil {
 		return
 	}
 
-	diag := validator.ValidatePolicies(&s, input.Policies)
+	diag := validator.ValidatePolicies(s, input.Policies)
 	if len(diag.Errors) > 0 {
 		t.Logf("Schema validation produced %d errors", len(diag.Errors))
 	}

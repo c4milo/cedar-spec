@@ -39,8 +39,8 @@ func parseEntityValidationInput(data []byte) (*schema.Schema, types.EntityMap, e
 		return nil, nil, err
 	}
 
-	var s schema.Schema
-	if err := s.UnmarshalJSON([]byte(input.Schema)); err != nil {
+	s, err := schema.NewFromJSON([]byte(input.Schema))
+	if err != nil {
 		return nil, nil, err
 	}
 
@@ -49,7 +49,7 @@ func parseEntityValidationInput(data []byte) (*schema.Schema, types.EntityMap, e
 		return nil, nil, err
 	}
 
-	return &s, entities, nil
+	return s, entities, nil
 }
 
 // runLeanEntityValidation runs Lean entity validation and returns the result.
@@ -178,8 +178,7 @@ func TestEntityValidationBasic(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			var s schema.Schema
-			err := s.UnmarshalJSON([]byte(tc.schema))
+			_, err := schema.NewFromJSON([]byte(tc.schema))
 			if (err == nil) != tc.expectParse {
 				t.Errorf("Schema parse: expected success=%v, got error=%v", tc.expectParse, err)
 			}

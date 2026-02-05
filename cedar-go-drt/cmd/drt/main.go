@@ -287,14 +287,16 @@ func loadSchema(schemaFile string) (*schema.Schema, error) {
 		return nil, fmt.Errorf("read schema file: %w", err)
 	}
 
-	var s schema.Schema
-	if err := s.UnmarshalJSON(schemaData); err != nil {
+	// Try JSON format first
+	s, err := schema.NewFromJSON(schemaData)
+	if err != nil {
 		// Try Cedar format
-		if err := s.UnmarshalCedar(schemaData); err != nil {
+		s, err = schema.NewFromCedar(schemaFile, schemaData)
+		if err != nil {
 			return nil, fmt.Errorf("parse schema: %w", err)
 		}
 	}
-	return &s, nil
+	return s, nil
 }
 
 func decisionToString(d cedar.Decision) string {

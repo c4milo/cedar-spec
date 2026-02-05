@@ -60,12 +60,12 @@ func prepareValidationPBTInput(data []byte, inputGen *typegen.InputGenerator) (*
 		return nil, nil, false
 	}
 
-	var s schema.Schema
-	if err := s.UnmarshalJSON(input.SchemaJSON); err != nil {
+	s, parseErr := schema.NewFromJSON(input.SchemaJSON)
+	if parseErr != nil {
 		return nil, nil, false
 	}
 
-	return input, &s, true
+	return input, s, true
 }
 
 func checkValidationResultConsistency(t *testing.T, valid bool, errorCount int) {
@@ -121,13 +121,13 @@ func FuzzValidationPBTTypeDirected(f *testing.F) {
 		}
 
 		// Parse the schema
-		var s schema.Schema
-		if err := s.UnmarshalJSON(input.SchemaJSON); err != nil {
+		s, parseErr := schema.NewFromJSON(input.SchemaJSON)
+		if parseErr != nil {
 			return
 		}
 
 		// Run validation
-		result := validator.ValidatePolicies(&s, input.Policies)
+		result := validator.ValidatePolicies(s, input.Policies)
 
 		// For type-directed generation, we expect most policies to validate
 		// This is a soft property - we just track statistics
@@ -170,9 +170,9 @@ func TestValidationProperties(t *testing.T) {
 		}
 	}`)
 
-	var s schema.Schema
-	if err := s.UnmarshalJSON(schemaJSON); err != nil {
-		t.Fatalf("Failed to parse schema: %v", err)
+	s, parseErr := schema.NewFromJSON(schemaJSON)
+	if parseErr != nil {
+		t.Fatalf("Failed to parse schema: %v", parseErr)
 	}
 
 	tests := []struct {
@@ -211,7 +211,7 @@ func TestValidationProperties(t *testing.T) {
 			}
 			ps.Add("test", &policy)
 
-			result := validator.ValidatePolicies(&s, ps)
+			result := validator.ValidatePolicies(s, ps)
 
 			if result.Valid != tc.expectValid {
 				t.Errorf("Expected Valid=%v, got Valid=%v (errors: %v)",
@@ -225,9 +225,9 @@ func TestValidationProperties(t *testing.T) {
 func TestValidationConsistency(t *testing.T) {
 	schemaJSON := []byte(`{"": {"entityTypes": {"User": {}}, "actions": {"view": {"appliesTo": {"principalTypes": ["User"], "resourceTypes": ["User"]}}}}}`)
 
-	var s schema.Schema
-	if err := s.UnmarshalJSON(schemaJSON); err != nil {
-		t.Fatalf("Failed to parse schema: %v", err)
+	s, parseErr := schema.NewFromJSON(schemaJSON)
+	if parseErr != nil {
+		t.Fatalf("Failed to parse schema: %v", parseErr)
 	}
 
 	ps := cedar.NewPolicySet()
@@ -240,7 +240,7 @@ func TestValidationConsistency(t *testing.T) {
 	var firstErrorCount int
 	firstRun := true
 	for i := range 10 {
-		result := validator.ValidatePolicies(&s, ps)
+		result := validator.ValidatePolicies(s, ps)
 		if firstRun {
 			firstValid = result.Valid
 			firstErrorCount = len(result.Errors)

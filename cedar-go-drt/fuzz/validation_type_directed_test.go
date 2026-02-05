@@ -54,13 +54,13 @@ func FuzzValidationTypeDirected(f *testing.F) {
 		}
 
 		// Parse the schema for cedar-go validator
-		var s schema.Schema
-		if err := s.UnmarshalJSON(input.SchemaJSON); err != nil {
+		s, schemaErr := schema.NewFromJSON(input.SchemaJSON)
+		if schemaErr != nil {
 			return // Schema parse error, skip
 		}
 
 		// Run cedar-go validation
-		goValidationResult := validator.ValidatePolicies(&s, input.Policies)
+		goValidationResult := validator.ValidatePolicies(s, input.Policies)
 		goResult := &comparison.ValidationResult{
 			Valid: goValidationResult.Valid,
 		}
@@ -82,13 +82,23 @@ func FuzzValidationTypeDirected(f *testing.F) {
 		// Compare results
 		diffs := comparison.CompareValidation(goResult, leanResult, config)
 		if len(diffs) > 0 {
-			t.Errorf("Type-directed validation divergence:\n%s\nSchema: %s",
-				comparison.FormatValidationDifferences(diffs), string(input.SchemaJSON))
+			// Log the policy for debugging
+			var policyStrings []string
+			for _, p := range input.Policies.All() {
+				policyStrings = append(policyStrings, string(p.MarshalCedar()))
+			}
+			t.Errorf("Type-directed validation divergence:\n%s\nSchema: %s\nPolicies: %v",
+				comparison.FormatValidationDifferences(diffs), string(input.SchemaJSON), policyStrings)
 		}
 
 		// Type soundness check
 		if err := comparison.CheckTypeSoundness(goResult, leanResult); err != nil {
-			t.Errorf("Type soundness violation: %v\nSchema: %s", err, string(input.SchemaJSON))
+			// Log the policy for debugging
+			var policyStrings []string
+			for _, p := range input.Policies.All() {
+				policyStrings = append(policyStrings, string(p.MarshalCedar()))
+			}
+			t.Errorf("Type soundness violation: %v\nSchema: %s\nPolicies: %v", err, string(input.SchemaJSON), policyStrings)
 		}
 	})
 }
@@ -97,13 +107,13 @@ func runTypeDirectedLeanValidation(t *testing.T, input *typegen.TypeDirectedInpu
 	t.Helper()
 
 	// Parse schema for proto conversion
-	var s schema.Schema
-	if err := s.UnmarshalJSON(input.SchemaJSON); err != nil {
+	s, err := schema.NewFromJSON(input.SchemaJSON)
+	if err != nil {
 		t.Logf("Failed to parse schema for Lean: %v", err)
 		return nil
 	}
 
-	valReq := proto.ValidationFromCedar(input.Policies, &s)
+	valReq := proto.ValidationFromCedar(input.Policies, s)
 	protoBytes, err := valReq.ToProtobuf()
 	if err != nil {
 		t.Logf("Failed to convert to protobuf: %v", err)

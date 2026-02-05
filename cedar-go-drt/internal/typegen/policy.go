@@ -16,6 +16,7 @@ package typegen
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/cedar-policy/cedar-go"
@@ -218,11 +219,12 @@ func (g *PolicyGenerator) writeAttributeComparison(sb *strings.Builder, depth in
 	for _, typeName := range g.schema.EntityTypeList {
 		entityDef := g.schema.Schema.EntityTypes[typeName]
 		if entityDef.Shape != nil && len(entityDef.Shape.Attributes) > 0 {
-			// Pick a random attribute
+			// Pick a random attribute - collect and sort for determinism
 			var attrNames []string
 			for name := range entityDef.Shape.Attributes {
 				attrNames = append(attrNames, name)
 			}
+			slices.Sort(attrNames)
 			if len(attrNames) > 0 {
 				attrName := Choose(g.rand, attrNames)
 				attr := entityDef.Shape.Attributes[attrName]
@@ -250,10 +252,12 @@ func (g *PolicyGenerator) writeContextAccess(sb *strings.Builder, depth int) {
 	for _, actionName := range g.schema.ActionList {
 		action := g.schema.Schema.Actions[actionName]
 		if action.AppliesTo != nil && action.AppliesTo.Context != nil && len(action.AppliesTo.Context.Attributes) > 0 {
+			// Collect and sort attribute names for determinism
 			var attrNames []string
 			for name := range action.AppliesTo.Context.Attributes {
 				attrNames = append(attrNames, name)
 			}
+			slices.Sort(attrNames)
 			if len(attrNames) > 0 {
 				attrName := Choose(g.rand, attrNames)
 				attr := action.AppliesTo.Context.Attributes[attrName]
@@ -280,10 +284,12 @@ func (g *PolicyGenerator) writeHasCheck(sb *strings.Builder) {
 	for _, typeName := range g.schema.EntityTypeList {
 		entityDef := g.schema.Schema.EntityTypes[typeName]
 		if entityDef.Shape != nil && len(entityDef.Shape.Attributes) > 0 {
+			// Collect and sort attribute names for determinism
 			var attrNames []string
 			for name := range entityDef.Shape.Attributes {
 				attrNames = append(attrNames, name)
 			}
+			slices.Sort(attrNames)
 			if len(attrNames) > 0 {
 				attrName := Choose(g.rand, attrNames)
 				if g.rand.Bool() {

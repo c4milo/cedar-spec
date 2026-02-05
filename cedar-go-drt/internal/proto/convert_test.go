@@ -84,17 +84,17 @@ func TestValidationFromCedar(t *testing.T) {
 		}
 	}`
 
-	var s schema.Schema
-	if err := s.UnmarshalJSON([]byte(schemaJSON)); err != nil {
+	s, err := schema.NewFromJSON([]byte(schemaJSON))
+	if err != nil {
 		t.Fatalf("parse schema: %v", err)
 	}
 
-	valReq := ValidationFromCedar(policies, &s)
+	valReq := ValidationFromCedar(policies, s)
 
 	if valReq.Policies != policies {
 		t.Error("policies not set correctly")
 	}
-	if valReq.Schema != &s {
+	if valReq.Schema != s {
 		t.Error("schema not set correctly")
 	}
 }
@@ -161,12 +161,12 @@ func TestValidationRequestToProtobuf(t *testing.T) {
 		}
 	}`
 
-	var s schema.Schema
-	if err := s.UnmarshalJSON([]byte(schemaJSON)); err != nil {
+	s, err := schema.NewFromJSON([]byte(schemaJSON))
+	if err != nil {
 		t.Fatalf("parse schema: %v", err)
 	}
 
-	valReq := ValidationFromCedar(policies, &s)
+	valReq := ValidationFromCedar(policies, s)
 
 	data, err := valReq.ToProtobuf()
 	if err != nil {
@@ -208,8 +208,8 @@ func TestEntityValidationFromCedar(t *testing.T) {
 		}
 	}`
 
-	var s schema.Schema
-	if err := s.UnmarshalJSON([]byte(schemaJSON)); err != nil {
+	s, err := schema.NewFromJSON([]byte(schemaJSON))
+	if err != nil {
 		t.Fatalf("parse schema: %v", err)
 	}
 
@@ -222,9 +222,9 @@ func TestEntityValidationFromCedar(t *testing.T) {
 		},
 	}
 
-	req := EntityValidationFromCedar(&s, entities)
+	req := EntityValidationFromCedar(s, entities)
 
-	if req.Schema != &s {
+	if req.Schema != s {
 		t.Error("schema not set correctly")
 	}
 	if len(req.Entities) != 1 {
@@ -261,8 +261,8 @@ func TestRequestValidationFromCedar(t *testing.T) {
 		}
 	}`
 
-	var s schema.Schema
-	if err := s.UnmarshalJSON([]byte(schemaJSON)); err != nil {
+	s, err := schema.NewFromJSON([]byte(schemaJSON))
+	if err != nil {
 		t.Fatalf("parse schema: %v", err)
 	}
 
@@ -273,9 +273,9 @@ func TestRequestValidationFromCedar(t *testing.T) {
 		Context:   types.NewRecord(types.RecordMap{}),
 	}
 
-	req := RequestValidationFromCedar(&s, request)
+	req := RequestValidationFromCedar(s, request)
 
-	if req.Schema != &s {
+	if req.Schema != s {
 		t.Error("schema not set correctly")
 	}
 	if req.Request != request {
@@ -302,8 +302,8 @@ func TestLevelValidationFromCedar(t *testing.T) {
 		}
 	}`
 
-	var s schema.Schema
-	if err := s.UnmarshalJSON([]byte(schemaJSON)); err != nil {
+	s, err := schema.NewFromJSON([]byte(schemaJSON))
+	if err != nil {
 		t.Fatalf("parse schema: %v", err)
 	}
 
@@ -314,9 +314,9 @@ func TestLevelValidationFromCedar(t *testing.T) {
 	}
 	policies.Add("test", &policy)
 
-	req := LevelValidationFromCedar(&s, policies, 2)
+	req := LevelValidationFromCedar(s, policies, 2)
 
-	if req.Schema != &s {
+	if req.Schema != s {
 		t.Error("schema not set correctly")
 	}
 	if req.Policies != policies {
@@ -335,8 +335,8 @@ func TestBatchedEvaluationFromCedar(t *testing.T) {
 		}
 	}`
 
-	var s schema.Schema
-	if err := s.UnmarshalJSON([]byte(schemaJSON)); err != nil {
+	s, err := schema.NewFromJSON([]byte(schemaJSON))
+	if err != nil {
 		t.Fatalf("parse schema: %v", err)
 	}
 
@@ -356,12 +356,12 @@ func TestBatchedEvaluationFromCedar(t *testing.T) {
 
 	entities := types.EntityMap{}
 
-	req := BatchedEvaluationFromCedar(policies, &s, request, entities, 5)
+	req := BatchedEvaluationFromCedar(policies, s, request, entities, 5)
 
 	if req.Policies != policies {
 		t.Error("policies not set correctly")
 	}
-	if req.Schema != &s {
+	if req.Schema != s {
 		t.Error("schema not set correctly")
 	}
 	if req.Request != request {

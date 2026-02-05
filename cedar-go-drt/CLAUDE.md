@@ -102,7 +102,7 @@ Compares cedar-go vs Lean results:
 - `CompareValidation()` - Valid/invalid with error messages
 - `CheckTypeSoundness()` - If cedar-go accepts, Lean must too
 
-## Fuzz Targets (47 total)
+## Fuzz Targets (51 total)
 
 ### Authorization (Lean Required)
 | Make Target | Purpose |
@@ -123,6 +123,12 @@ Compares cedar-go vs Lean results:
 | `fuzz-request-val` | Request validation |
 | `fuzz-level-val` | Level-based validation |
 
+### Schema Well-Formedness (Lean Required)
+| Make Target | Purpose |
+|-------------|---------|
+| `fuzz-schema-wf` | Schema well-formedness DRT |
+| `fuzz-schema-wf-td` | Type-directed schema well-formedness |
+
 ### Evaluation (Lean Required)
 | Make Target | Purpose |
 |-------------|---------|
@@ -130,6 +136,12 @@ Compares cedar-go vs Lean results:
 | `fuzz-eval-td` | Type-directed evaluation |
 | `fuzz-batch-drt` | Batch evaluation vs Lean |
 | `fuzz-partial-eval` | Partial evaluation soundness |
+
+### Parser Crash Testing (No Lean Required) ⚡
+| Make Target | Purpose |
+|-------------|---------|
+| `fuzz-parser-crash` | Tests parsers don't panic on arbitrary input |
+| `fuzz-schema-parser` | Schema parser crash testing |
 
 ### Pure Go (No Lean Required) ⚡
 | Make Target | Purpose |

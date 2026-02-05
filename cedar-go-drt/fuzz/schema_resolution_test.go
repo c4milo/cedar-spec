@@ -26,8 +26,8 @@ import (
 )
 
 type schemaResolutionContext struct {
-	schemaFromJSON  schema.Schema
-	schemaFromCedar schema.Schema
+	schemaFromJSON  *schema.Schema
+	schemaFromCedar *schema.Schema
 }
 
 // FuzzSchemaResolution tests that schemas parsed from different formats
@@ -67,19 +67,23 @@ func prepareSchemaResolutionInput(t *testing.T, data []byte, inputGen *typegen.I
 
 	var ctx schemaResolutionContext
 
-	if err := ctx.schemaFromJSON.UnmarshalJSON(input.SchemaJSON); err != nil {
+	schemaFromJSON, err := schema.NewFromJSON(input.SchemaJSON)
+	if err != nil {
 		return nil, nil, false
 	}
+	ctx.schemaFromJSON = schemaFromJSON
 
 	cedarBytes, err := ctx.schemaFromJSON.MarshalCedar()
 	if err != nil {
 		return nil, nil, false
 	}
 
-	if err := ctx.schemaFromCedar.UnmarshalCedar(cedarBytes); err != nil {
+	schemaFromCedar, err := schema.NewFromCedar("resolution.cedar", cedarBytes)
+	if err != nil {
 		t.Errorf("Failed to parse schema from Cedar text: %v\nCedar: %s", err, string(cedarBytes))
 		return nil, nil, false
 	}
+	ctx.schemaFromCedar = schemaFromCedar
 
 	return input, &ctx, true
 }
@@ -94,8 +98,8 @@ func comparePolicyValidation(t *testing.T, policy *cedar.Policy, ctx *schemaReso
 	singlePolicy := cedar.NewPolicySet()
 	singlePolicy.Add("test", policy)
 
-	diagJSON := validator.ValidatePolicies(&ctx.schemaFromJSON, singlePolicy)
-	diagCedar := validator.ValidatePolicies(&ctx.schemaFromCedar, singlePolicy)
+	diagJSON := validator.ValidatePolicies(ctx.schemaFromJSON, singlePolicy)
+	diagCedar := validator.ValidatePolicies(ctx.schemaFromCedar, singlePolicy)
 
 	jsonPassed := len(diagJSON.Errors) == 0
 	cedarPassed := len(diagCedar.Errors) == 0
@@ -143,8 +147,8 @@ func testSchemaEquivalence(t *testing.T, data []byte, inputGen *typegen.InputGen
 }
 
 func parseSchemasBothWays(schemaJSON []byte) (*schema.Schema, *schema.Schema, bool) {
-	var schemaFromJSON schema.Schema
-	if err := schemaFromJSON.UnmarshalJSON(schemaJSON); err != nil {
+	schemaFromJSON, err := schema.NewFromJSON(schemaJSON)
+	if err != nil {
 		return nil, nil, false
 	}
 
@@ -153,12 +157,12 @@ func parseSchemasBothWays(schemaJSON []byte) (*schema.Schema, *schema.Schema, bo
 		return nil, nil, false
 	}
 
-	var schemaViaCedar schema.Schema
-	if err := schemaViaCedar.UnmarshalCedar(cedarBytes); err != nil {
+	schemaViaCedar, err := schema.NewFromCedar("bothways.cedar", cedarBytes)
+	if err != nil {
 		return nil, nil, false
 	}
 
-	return &schemaFromJSON, &schemaViaCedar, true
+	return schemaFromJSON, schemaViaCedar, true
 }
 
 func compareSchemaJSON(t *testing.T, s1, s2 *schema.Schema) {
@@ -248,8 +252,8 @@ func runSchemaResolutionTestCase(t *testing.T, tc schemaResolutionTestCase) {
 }
 
 func parseTestCaseSchemas(t *testing.T, schemaCedar string) (*schema.Schema, *schema.Schema) {
-	var schemaFromCedar schema.Schema
-	if err := schemaFromCedar.UnmarshalCedar([]byte(schemaCedar)); err != nil {
+	schemaFromCedar, err := schema.NewFromCedar("testcase.cedar", []byte(schemaCedar))
+	if err != nil {
 		t.Fatalf("Failed to parse Cedar schema: %v", err)
 	}
 
@@ -258,12 +262,12 @@ func parseTestCaseSchemas(t *testing.T, schemaCedar string) (*schema.Schema, *sc
 		t.Fatalf("Failed to marshal schema to JSON: %v", err)
 	}
 
-	var schemaFromJSON schema.Schema
-	if err := schemaFromJSON.UnmarshalJSON(jsonBytes); err != nil {
+	schemaFromJSON, err := schema.NewFromJSON(jsonBytes)
+	if err != nil {
 		t.Fatalf("Failed to parse JSON schema: %v", err)
 	}
 
-	return &schemaFromCedar, &schemaFromJSON
+	return schemaFromCedar, schemaFromJSON
 }
 
 func parseTestCasePolicy(t *testing.T, policy string) *cedar.PolicySet {
@@ -300,8 +304,8 @@ func TestSchemaJSONRoundtrip(t *testing.T) {
 		action view appliesTo { principal: User, resource: Doc };
 	`
 
-	var s schema.Schema
-	if err := s.UnmarshalCedar([]byte(schemaCedar)); err != nil {
+	s, err := schema.NewFromCedar("roundtrip.cedar", []byte(schemaCedar))
+	if err != nil {
 		t.Fatalf("Failed to parse Cedar schema: %v", err)
 	}
 
@@ -318,8 +322,8 @@ func TestSchemaJSONRoundtrip(t *testing.T) {
 	}
 
 	// JSON -> Schema
-	var roundtripped schema.Schema
-	if err := roundtripped.UnmarshalJSON(jsonBytes); err != nil {
+	roundtripped, err := schema.NewFromJSON(jsonBytes)
+	if err != nil {
 		t.Fatalf("Failed to parse JSON schema: %v", err)
 	}
 
@@ -327,7 +331,7 @@ func TestSchemaJSONRoundtrip(t *testing.T) {
 	policy := `permit(principal, action, resource) when { principal.name == "alice" };`
 	policies, _ := cedar.NewPolicySetFromBytes("test.cedar", []byte(policy))
 
-	diag := validator.ValidatePolicies(&roundtripped, policies)
+	diag := validator.ValidatePolicies(roundtripped, policies)
 	if len(diag.Errors) > 0 {
 		t.Errorf("Roundtripped schema validation failed: %v", diag.Errors)
 	}

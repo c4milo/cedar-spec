@@ -31,8 +31,8 @@ func FuzzJSONSchemaRoundtrip(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, schemaBytes []byte) {
 		// Parse JSON schema
-		var s1 schema.Schema
-		if err := s1.UnmarshalJSON(schemaBytes); err != nil {
+		s1, err := schema.NewFromJSON(schemaBytes)
+		if err != nil {
 			return // Invalid JSON, skip
 		}
 
@@ -43,8 +43,8 @@ func FuzzJSONSchemaRoundtrip(f *testing.F) {
 		}
 
 		// Parse again
-		var s2 schema.Schema
-		if err := s2.UnmarshalJSON(jsonBytes1); err != nil {
+		s2, err := schema.NewFromJSON(jsonBytes1)
+		if err != nil {
 			t.Errorf("Failed to parse re-marshaled JSON: %v", err)
 			return
 		}
@@ -72,8 +72,8 @@ func FuzzSchemaCedarToJSON(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, cedarBytes []byte) {
 		// Parse Cedar schema
-		var s schema.Schema
-		if err := s.UnmarshalCedar(cedarBytes); err != nil {
+		s, err := schema.NewFromCedar("fuzz.cedar", cedarBytes)
+		if err != nil {
 			return // Invalid Cedar schema, skip
 		}
 
@@ -103,8 +103,8 @@ func FuzzSchemaJSONToCedar(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, jsonBytes []byte) {
 		// Parse JSON schema
-		var s schema.Schema
-		if err := s.UnmarshalJSON(jsonBytes); err != nil {
+		s, err := schema.NewFromJSON(jsonBytes)
+		if err != nil {
 			return // Invalid JSON, skip
 		}
 

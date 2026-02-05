@@ -16,6 +16,7 @@ package typegen
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/cedar-policy/cedar-go/types"
 )
@@ -124,8 +125,16 @@ func (g *EntityGenerator) generateAttributes(shape *SchemaType) types.Record {
 		return types.NewRecord(types.RecordMap{})
 	}
 
+	// Collect and sort attribute names for deterministic generation
+	var attrNames []string
+	for name := range shape.Attributes {
+		attrNames = append(attrNames, name)
+	}
+	slices.Sort(attrNames)
+
 	attrs := make(types.RecordMap)
-	for attrName, attrDef := range shape.Attributes {
+	for _, attrName := range attrNames {
+		attrDef := shape.Attributes[attrName]
 		// Skip optional attributes sometimes
 		if !attrDef.Required && g.rand.Bool() {
 			continue

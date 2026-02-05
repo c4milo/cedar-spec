@@ -231,18 +231,35 @@ func Validate(request []byte) (*ValidationResponse, error) {
 		return nil, err
 	}
 
-	// Parse the inner timed result structure
-	var timedResult struct {
-		Data     json.RawMessage `json:"data"`
-		Duration uint64          `json:"duration"`
+	// Handle empty response
+	if jsonStr == "" {
+		return nil, fmt.Errorf("lean returned empty response")
 	}
-	if err := json.Unmarshal([]byte(jsonStr), &timedResult); err != nil {
-		return nil, fmt.Errorf("failed to parse timed result: %w", err)
+
+	// Parse the outer result structure
+	// Lean returns: {"ok": {"duration": N, "data": {...}}} or {"error": "msg"}
+	var outerResult struct {
+		Ok *struct {
+			Data     json.RawMessage `json:"data"`
+			Duration uint64          `json:"duration"`
+		} `json:"ok"`
+		Error *string `json:"error"`
+	}
+	if err := json.Unmarshal([]byte(jsonStr), &outerResult); err != nil {
+		return nil, fmt.Errorf("failed to parse outer result: %w", err)
+	}
+
+	if outerResult.Error != nil {
+		return nil, fmt.Errorf("lean error: %s", *outerResult.Error)
+	}
+
+	if outerResult.Ok == nil {
+		return nil, errors.New("unexpected response format from Lean")
 	}
 
 	// Parse validation response - Lean returns either {"ok": null} or {"error": "msg"}
 	var rawResponse map[string]any
-	if err := json.Unmarshal(timedResult.Data, &rawResponse); err != nil {
+	if err := json.Unmarshal(outerResult.Ok.Data, &rawResponse); err != nil {
 		return nil, fmt.Errorf("failed to parse validation response: %w", err)
 	}
 
@@ -282,16 +299,29 @@ func LevelValidate(request []byte) (*ValidationResponse, error) {
 		return nil, err
 	}
 
-	var timedResult struct {
-		Data     json.RawMessage `json:"data"`
-		Duration uint64          `json:"duration"`
+	// Parse the outer result structure
+	// Lean returns: {"ok": {"duration": N, "data": {...}}} or {"error": "msg"}
+	var outerResult struct {
+		Ok *struct {
+			Data     json.RawMessage `json:"data"`
+			Duration uint64          `json:"duration"`
+		} `json:"ok"`
+		Error *string `json:"error"`
 	}
-	if err := json.Unmarshal([]byte(jsonStr), &timedResult); err != nil {
-		return nil, fmt.Errorf("failed to parse timed result: %w", err)
+	if err := json.Unmarshal([]byte(jsonStr), &outerResult); err != nil {
+		return nil, fmt.Errorf("failed to parse outer result: %w", err)
+	}
+
+	if outerResult.Error != nil {
+		return nil, fmt.Errorf("lean error: %s", *outerResult.Error)
+	}
+
+	if outerResult.Ok == nil {
+		return nil, errors.New("unexpected response format from Lean")
 	}
 
 	var rawResponse map[string]any
-	if err := json.Unmarshal(timedResult.Data, &rawResponse); err != nil {
+	if err := json.Unmarshal(outerResult.Ok.Data, &rawResponse); err != nil {
 		return nil, fmt.Errorf("failed to parse validation response: %w", err)
 	}
 
@@ -333,16 +363,29 @@ func ValidateEntities(request []byte) (*ValidationResponse, error) {
 		return nil, err
 	}
 
-	var timedResult struct {
-		Data     json.RawMessage `json:"data"`
-		Duration uint64          `json:"duration"`
+	// Parse the outer result structure
+	// Lean returns: {"ok": {"duration": N, "data": {...}}} or {"error": "msg"}
+	var outerResult struct {
+		Ok *struct {
+			Data     json.RawMessage `json:"data"`
+			Duration uint64          `json:"duration"`
+		} `json:"ok"`
+		Error *string `json:"error"`
 	}
-	if err := json.Unmarshal([]byte(jsonStr), &timedResult); err != nil {
-		return nil, fmt.Errorf("failed to parse timed result: %w", err)
+	if err := json.Unmarshal([]byte(jsonStr), &outerResult); err != nil {
+		return nil, fmt.Errorf("failed to parse outer result: %w", err)
+	}
+
+	if outerResult.Error != nil {
+		return nil, fmt.Errorf("lean error: %s", *outerResult.Error)
+	}
+
+	if outerResult.Ok == nil {
+		return nil, errors.New("unexpected response format from Lean")
 	}
 
 	var rawResponse map[string]any
-	if err := json.Unmarshal(timedResult.Data, &rawResponse); err != nil {
+	if err := json.Unmarshal(outerResult.Ok.Data, &rawResponse); err != nil {
 		return nil, fmt.Errorf("failed to parse validation response: %w", err)
 	}
 
@@ -384,16 +427,29 @@ func ValidateRequest(request []byte) (*ValidationResponse, error) {
 		return nil, err
 	}
 
-	var timedResult struct {
-		Data     json.RawMessage `json:"data"`
-		Duration uint64          `json:"duration"`
+	// Parse the outer result structure
+	// Lean returns: {"ok": {"duration": N, "data": {...}}} or {"error": "msg"}
+	var outerResult struct {
+		Ok *struct {
+			Data     json.RawMessage `json:"data"`
+			Duration uint64          `json:"duration"`
+		} `json:"ok"`
+		Error *string `json:"error"`
 	}
-	if err := json.Unmarshal([]byte(jsonStr), &timedResult); err != nil {
-		return nil, fmt.Errorf("failed to parse timed result: %w", err)
+	if err := json.Unmarshal([]byte(jsonStr), &outerResult); err != nil {
+		return nil, fmt.Errorf("failed to parse outer result: %w", err)
+	}
+
+	if outerResult.Error != nil {
+		return nil, fmt.Errorf("lean error: %s", *outerResult.Error)
+	}
+
+	if outerResult.Ok == nil {
+		return nil, errors.New("unexpected response format from Lean")
 	}
 
 	var rawResponse map[string]any
-	if err := json.Unmarshal(timedResult.Data, &rawResponse); err != nil {
+	if err := json.Unmarshal(outerResult.Ok.Data, &rawResponse); err != nil {
 		return nil, fmt.Errorf("failed to parse validation response: %w", err)
 	}
 

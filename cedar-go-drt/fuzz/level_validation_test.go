@@ -41,8 +41,8 @@ func parseLevelValidationInput(data []byte) (*schema.Schema, *cedar.PolicySet, i
 		return nil, nil, 0, err
 	}
 
-	var s schema.Schema
-	if err := s.UnmarshalJSON([]byte(input.Schema)); err != nil {
+	s, err := schema.NewFromJSON([]byte(input.Schema))
+	if err != nil {
 		return nil, nil, 0, err
 	}
 
@@ -55,7 +55,7 @@ func parseLevelValidationInput(data []byte) (*schema.Schema, *cedar.PolicySet, i
 		policies.Add(cedar.PolicyID(fmt.Sprintf("policy%d", i)), &policy)
 	}
 
-	return &s, policies, input.Level, nil
+	return s, policies, input.Level, nil
 }
 
 // runLeanLevelValidation runs Lean level validation and returns the result.
@@ -213,8 +213,7 @@ func TestLevelValidationBasic(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			var s schema.Schema
-			err := s.UnmarshalJSON([]byte(tc.schema))
+			_, err := schema.NewFromJSON([]byte(tc.schema))
 			if (err == nil) != tc.expectParse {
 				t.Errorf("Schema parse: expected success=%v, got error=%v", tc.expectParse, err)
 			}

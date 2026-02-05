@@ -97,15 +97,15 @@ func preparePartialEvalContext(t *testing.T, data []byte, inputGen *typegen.Inpu
 		return nil, false
 	}
 
-	var s schema.Schema
-	if err := s.UnmarshalJSON(input.SchemaJSON); err != nil {
+	s, err := schema.NewFromJSON(input.SchemaJSON)
+	if err != nil {
 		lt.Close()
 		return nil, false
 	}
 
 	return &partialEvalContext{
 		input:      input,
-		schema:     &s,
+		schema:     s,
 		leanThread: lt,
 	}, true
 }
@@ -323,8 +323,8 @@ func runPartialEvalTestCase(t *testing.T, tc partialEvalTestCase) {
 	}
 
 	schemaJSON := createMinimalSchemaJSON(tc.principal.Type, tc.action, tc.resource.Type)
-	var s schema.Schema
-	if err := s.UnmarshalJSON(schemaJSON); err != nil {
+	s, err := schema.NewFromJSON(schemaJSON)
+	if err != nil {
 		t.Fatalf("Failed to parse schema: %v", err)
 	}
 
@@ -335,7 +335,7 @@ func runPartialEvalTestCase(t *testing.T, tc partialEvalTestCase) {
 		Context:   types.Record{},
 	}
 
-	resp := runPartialEvalLean(t, policies, &s, req)
+	resp := runPartialEvalLean(t, policies, s, req)
 	if resp == nil {
 		return
 	}

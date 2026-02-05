@@ -42,8 +42,8 @@ func parseValidationInput(data []byte) (*schema.Schema, *cedar.PolicySet, error)
 		return nil, nil, err
 	}
 
-	var s schema.Schema
-	if err := s.UnmarshalJSON([]byte(input.Schema)); err != nil {
+	s, err := schema.NewFromJSON([]byte(input.Schema))
+	if err != nil {
 		return nil, nil, err
 	}
 
@@ -56,7 +56,7 @@ func parseValidationInput(data []byte) (*schema.Schema, *cedar.PolicySet, error)
 		policies.Add(cedar.PolicyID(fmt.Sprintf("policy%d", i)), &policy)
 	}
 
-	return &s, policies, nil
+	return s, policies, nil
 }
 
 // runLeanValidation runs Lean validation and returns the result.
@@ -90,8 +90,11 @@ func runLeanValidation(t *testing.T, s *schema.Schema, policies *cedar.PolicySet
 }
 
 // runCedarGoValidation runs cedar-go policy validation and returns the result.
+// Uses WithAllowUnknownEntityTypes to match Lean's behavior where unknown entity types
+// in principalTypes/resourceTypes are accepted at schema validation time and handled
+// at policy validation time via impossiblePolicy checks.
 func runCedarGoValidation(s *schema.Schema, policies *cedar.PolicySet) *comparison.ValidationResult {
-	result := validator.ValidatePolicies(s, policies)
+	result := validator.ValidatePolicies(s, policies, validator.WithAllowUnknownEntityTypes())
 
 	var errors []string
 	for _, err := range result.Errors {
@@ -177,8 +180,7 @@ func TestValidationBasic(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			var s schema.Schema
-			err := s.UnmarshalJSON([]byte(tc.schema))
+			_, err := schema.NewFromJSON([]byte(tc.schema))
 			if (err == nil) != tc.expectParse {
 				t.Errorf("Schema parse: expected success=%v, got error=%v", tc.expectParse, err)
 			}
