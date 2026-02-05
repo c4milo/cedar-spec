@@ -86,6 +86,27 @@ def cvc5 : IO Solver := do
   | .none      => throw (IO.userError "CVC5 environment variable not defined.")
 
 /--
+  Returns an instance of the Z3 solver that is backed by the executable
+  specified in the environment variable "Z3".
+-/
+def z3 : IO Solver := do
+  match (← IO.getEnv "Z3") with
+  | .some path => spawn path ["-smt2", "-in"].toArray
+  | .none      => throw (IO.userError "Z3 environment variable not defined.")
+
+/--
+  Returns an SMT solver based on environment variables.
+  Prefers CVC5 if available, falls back to Z3.
+-/
+def defaultSolver : IO Solver := do
+  match (← IO.getEnv "CVC5") with
+  | .some path => spawn path ["--quiet", "--lang", "smt"].toArray
+  | .none =>
+    match (← IO.getEnv "Z3") with
+    | .some path => spawn path ["-smt2", "-in"].toArray
+    | .none => throw (IO.userError "No SMT solver found. Set CVC5 or Z3 environment variable.")
+
+/--
   Returns a solver that writes all issued commands to the given stream `s`.
   Commands that produce output, such as `checkSat`, write the command to `s` and
   return values that are sound according to the SMTLib spec (but generally not

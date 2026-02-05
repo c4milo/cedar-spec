@@ -52,7 +52,21 @@ else
     DYLIB_PATH_VAR := LD_LIBRARY_PATH
 endif
 
-.PHONY: all lean proto build test test-fuzz lint deadcode fmt fuzz-auth fuzz-val fuzz-val-strict fuzz-eval fuzz-eval-td fuzz-entity-val fuzz-request-val fuzz-level-val fuzz-auth-td fuzz-val-td fuzz-batch fuzz-batch-drt fuzz-roundtrip fuzz-proto-roundtrip fuzz-rbac fuzz-rbac-authorizer fuzz-val-pbt fuzz-val-pbt-td fuzz-wildcard fuzz-partial-eval fuzz-partial-eval-pbt fuzz-policy-cedar-to-json fuzz-policy-json-to-cedar fuzz-tpe-query-principal fuzz-tpe-query-resource fuzz-tpe-query-action fuzz-entity-slicing fuzz-schema-resolution fuzz-input-generation fuzz-parser-crash fuzz-schema-parser fuzz-schema-wf fuzz-schema-wf-td fuzz-forbid-trumps fuzz-default-deny fuzz-order-dup fuzz-tpe-drt fuzz-tpe-soundness fuzz-tpe-reauth corpus corpus-from-drt corpus-full corpus-expanded corpus-validation corpus-validation-expanded clean help
+# SMT solver paths for SymCC targets
+# The Lean code uses CVC5 if available, falling back to Z3
+CVC5_PATH := $(or $(CVC5),$(shell which cvc5 2>/dev/null),$(wildcard $(HOME)/.local/bin/cvc5),$(wildcard /usr/local/bin/cvc5),$(wildcard /opt/homebrew/bin/cvc5))
+Z3_PATH := $(or $(Z3),$(shell which z3 2>/dev/null),$(wildcard /opt/homebrew/bin/z3),$(wildcard /usr/local/bin/z3))
+
+# SMT solver environment variables (set both, Lean picks CVC5 first)
+SMT_ENV := $(if $(CVC5_PATH),CVC5="$(CVC5_PATH)") $(if $(Z3_PATH),Z3="$(Z3_PATH)")
+
+# Check if at least one solver is available
+HAS_SMT_SOLVER := $(or $(CVC5_PATH),$(Z3_PATH))
+
+# Fuzz time for SymCC targets (can be overridden: make fuzz-symcc-all SYMCC_FUZZTIME=1m)
+SYMCC_FUZZTIME ?= 2m
+
+.PHONY: all lean proto build test test-fuzz test-symcc lint deadcode fmt fuzz-auth fuzz-val fuzz-val-strict fuzz-eval fuzz-eval-td fuzz-entity-val fuzz-request-val fuzz-level-val fuzz-auth-td fuzz-val-td fuzz-batch fuzz-batch-drt fuzz-roundtrip fuzz-proto-roundtrip fuzz-rbac fuzz-rbac-authorizer fuzz-val-pbt fuzz-val-pbt-td fuzz-wildcard fuzz-partial-eval fuzz-partial-eval-pbt fuzz-policy-cedar-to-json fuzz-policy-json-to-cedar fuzz-tpe-query-principal fuzz-tpe-query-resource fuzz-tpe-query-action fuzz-entity-slicing fuzz-schema-resolution fuzz-input-generation fuzz-parser-crash fuzz-schema-parser fuzz-schema-wf fuzz-schema-wf-td fuzz-forbid-trumps fuzz-default-deny fuzz-order-dup fuzz-tpe-drt fuzz-tpe-soundness fuzz-tpe-reauth fuzz-symcc-never-errors fuzz-symcc-always-matches fuzz-symcc-never-matches fuzz-symcc-always-allows fuzz-symcc-always-denies fuzz-symcc-matches-equiv fuzz-symcc-matches-implies fuzz-symcc-equiv fuzz-symcc-implies fuzz-symcc-all corpus corpus-from-drt corpus-full corpus-expanded corpus-validation corpus-validation-expanded clean help
 
 all: proto build
 
@@ -145,13 +159,23 @@ test: proto
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
 	go test -v ./internal/...
 
-## test-fuzz: Run unit tests in fuzz package (non-fuzz tests only)
+## test-fuzz: Run unit tests in fuzz package (non-fuzz tests only, excludes SymCC tests)
 test-fuzz: proto
 	CGO_ENABLED=1 \
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
-	go test -v -run '^Test' ./fuzz/
+	go test -v -run '^Test[^S]|^TestS[^y]' ./fuzz/
+
+## test-symcc: Run SymCC unit tests (requires cvc5)
+test-symcc: proto
+	@if [ -z "$(HAS_SMT_SOLVER)" ]; then echo "Error: No SMT solver found. Install cvc5 or z3."; exit 1; fi
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
+	go test -v -run '^TestSymCC' ./fuzz/
 
 ## lint: Run Go linters (golangci-lint preferred, falls back to go vet)
 lint:
@@ -520,6 +544,135 @@ fuzz-tpe-reauth: proto
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	go test -fuzz=FuzzTPEResidualReauthorize -fuzztime=5m ./fuzz/
+
+## fuzz-symcc-never-errors: Run SymCC neverErrors fuzzing (requires cvc5)
+## Tests that policies don't produce evaluation errors
+fuzz-symcc-never-errors: proto
+	@if [ -z "$(HAS_SMT_SOLVER)" ]; then echo "Error: No SMT solver found. Install cvc5 or z3."; exit 1; fi
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
+	go test -fuzz=FuzzSymCCNeverErrors -fuzztime=5m ./fuzz/
+
+## fuzz-symcc-always-matches: Run SymCC alwaysMatches fuzzing (requires cvc5)
+## Tests that policy conditions always evaluate to true
+fuzz-symcc-always-matches: proto
+	@if [ -z "$(HAS_SMT_SOLVER)" ]; then echo "Error: No SMT solver found. Install cvc5 or z3."; exit 1; fi
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
+	go test -fuzz=FuzzSymCCAlwaysMatches -fuzztime=5m ./fuzz/
+
+## fuzz-symcc-never-matches: Run SymCC neverMatches fuzzing (requires cvc5)
+## Tests that policy conditions never evaluate to true
+fuzz-symcc-never-matches: proto
+	@if [ -z "$(HAS_SMT_SOLVER)" ]; then echo "Error: No SMT solver found. Install cvc5 or z3."; exit 1; fi
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
+	go test -fuzz=FuzzSymCCNeverMatches -fuzztime=5m ./fuzz/
+
+## fuzz-symcc-always-allows: Run SymCC alwaysAllows fuzzing (requires cvc5)
+## Tests that policy sets always allow requests
+fuzz-symcc-always-allows: proto
+	@if [ -z "$(HAS_SMT_SOLVER)" ]; then echo "Error: No SMT solver found. Install cvc5 or z3."; exit 1; fi
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
+	go test -fuzz=FuzzSymCCAlwaysAllows -fuzztime=5m ./fuzz/
+
+## fuzz-symcc-always-denies: Run SymCC alwaysDenies fuzzing (requires cvc5)
+## Tests that policy sets always deny requests
+fuzz-symcc-always-denies: proto
+	@if [ -z "$(HAS_SMT_SOLVER)" ]; then echo "Error: No SMT solver found. Install cvc5 or z3."; exit 1; fi
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
+	go test -fuzz=FuzzSymCCAlwaysDenies -fuzztime=5m ./fuzz/
+
+## fuzz-symcc-matches-equiv: Run SymCC matchesEquivalent fuzzing (requires cvc5)
+## Tests that two policies have equivalent conditions
+fuzz-symcc-matches-equiv: proto
+	@if [ -z "$(HAS_SMT_SOLVER)" ]; then echo "Error: No SMT solver found. Install cvc5 or z3."; exit 1; fi
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
+	go test -fuzz=FuzzSymCCMatchesEquivalent -fuzztime=5m ./fuzz/
+
+## fuzz-symcc-matches-implies: Run SymCC matchesImplies fuzzing (requires cvc5)
+## Tests that one policy's condition implies another's
+fuzz-symcc-matches-implies: proto
+	@if [ -z "$(HAS_SMT_SOLVER)" ]; then echo "Error: No SMT solver found. Install cvc5 or z3."; exit 1; fi
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
+	go test -fuzz=FuzzSymCCMatchesImplies -fuzztime=5m ./fuzz/
+
+## fuzz-symcc-equiv: Run SymCC equivalent fuzzing (requires cvc5)
+## Tests that two policy sets are equivalent
+fuzz-symcc-equiv: proto
+	@if [ -z "$(HAS_SMT_SOLVER)" ]; then echo "Error: No SMT solver found. Install cvc5 or z3."; exit 1; fi
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
+	go test -fuzz=FuzzSymCCEquivalent -fuzztime=5m ./fuzz/
+
+## fuzz-symcc-implies: Run SymCC implies fuzzing (requires cvc5)
+## Tests that one policy set implies another
+fuzz-symcc-implies: proto
+	@if [ -z "$(HAS_SMT_SOLVER)" ]; then echo "Error: No SMT solver found. Install cvc5 or z3."; exit 1; fi
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
+	go test -fuzz=FuzzSymCCImplies -fuzztime=5m ./fuzz/
+
+## fuzz-symcc-all: Run stable SymCC fuzz targets (requires cvc5)
+## Note: Run 'ulimit -n 10240' first to avoid "too many open files" errors
+## Note: Some SymCC targets (alwaysMatches, alwaysAllows, alwaysDenies, etc.) can cause
+##       cvc5 to hang on complex SMT queries. This target runs only the stable neverErrors test.
+##       Use individual targets (fuzz-symcc-*) to run other tests with caution.
+fuzz-symcc-all: proto
+	@if [ -z "$(HAS_SMT_SOLVER)" ]; then echo "Error: No SMT solver found. Install cvc5 or z3."; exit 1; fi
+	@echo "Running stable SymCC fuzz target (FuzzSymCCNeverErrors)..."
+	@echo "Note: Other SymCC targets may hang on complex SMT queries."
+	@echo "      Run them individually with 'make fuzz-symcc-<target>' if needed."
+	@echo ""
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
+	go test -fuzz=FuzzSymCCNeverErrors -fuzztime=$(SYMCC_FUZZTIME) ./fuzz/
+	@echo ""
+	@echo "Stable SymCC fuzz target completed!"
+	@echo ""
+	@echo "To run other SymCC targets individually (may hang on complex inputs):"
+	@echo "  make fuzz-symcc-always-matches"
+	@echo "  make fuzz-symcc-never-matches"
+	@echo "  make fuzz-symcc-always-allows"
+	@echo "  make fuzz-symcc-always-denies"
+	@echo "  make fuzz-symcc-matches-equiv"
+	@echo "  make fuzz-symcc-matches-implies"
+	@echo "  make fuzz-symcc-equiv"
+	@echo "  make fuzz-symcc-implies"
 
 ## run-drt: Run manual DRT test via CLI
 run-drt: proto build
