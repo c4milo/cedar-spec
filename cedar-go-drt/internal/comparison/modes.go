@@ -61,6 +61,9 @@ type ComparisonConfig struct {
 }
 
 // DefaultConfig returns the default comparison configuration.
+// Uses AgreeOnValid for validation - this matches Rust DRT's effective behavior
+// since Rust filters out InvalidActionApplication errors before AgreeOnAll comparison.
+// The key property tested is type soundness: if cedar-go validates, Lean must too.
 func DefaultConfig() ComparisonConfig {
 	return ComparisonConfig{
 		ErrorMode:             ErrorComparisonModePolicyIDs,

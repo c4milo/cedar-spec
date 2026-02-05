@@ -215,93 +215,256 @@ func (g *PolicyGenerator) writeConditionExpr(sb *strings.Builder, depth int) {
 }
 
 func (g *PolicyGenerator) writeAttributeComparison(sb *strings.Builder, depth int) {
-	// Find an entity type with attributes
-	for _, typeName := range g.schema.EntityTypeList {
-		entityDef := g.schema.Schema.EntityTypes[typeName]
-		if entityDef.Shape != nil && len(entityDef.Shape.Attributes) > 0 {
-			// Pick a random attribute - collect and sort for determinism
-			var attrNames []string
-			for name := range entityDef.Shape.Attributes {
-				attrNames = append(attrNames, name)
-			}
-			slices.Sort(attrNames)
-			if len(attrNames) > 0 {
-				attrName := Choose(g.rand, attrNames)
-				attr := entityDef.Shape.Attributes[attrName]
+	// Find common attributes across all principal types for all actions
+	// This ensures type safety - only access attributes that ALL principal types have
+	commonAttrs := g.findCommonPrincipalAttributes()
+	if len(commonAttrs) == 0 {
+		sb.WriteString("true")
+		return
+	}
 
-				// Generate comparison based on type
-				switch attr.Type {
-				case "String":
-					fmt.Fprintf(sb, "principal.%s == \"%s\"", attrName, g.rand.String(5))
-				case "Long":
-					fmt.Fprintf(sb, "principal.%s == %d", attrName, g.rand.IntRange(-100, 100))
-				case "Boolean":
-					fmt.Fprintf(sb, "principal.%s", attrName)
-				default:
-					sb.WriteString("true")
-				}
-				return
+	// Pick a random common attribute
+	var attrNames []string
+	for name := range commonAttrs {
+		attrNames = append(attrNames, name)
+	}
+	slices.Sort(attrNames)
+	attrName := Choose(g.rand, attrNames)
+	attrType := commonAttrs[attrName]
+
+	// Generate comparison based on type
+	switch attrType {
+	case "String":
+		fmt.Fprintf(sb, "principal.%s == \"%s\"", attrName, g.rand.String(5))
+	case "Long":
+		fmt.Fprintf(sb, "principal.%s == %d", attrName, g.rand.IntRange(-100, 100))
+	case "Boolean":
+		fmt.Fprintf(sb, "principal.%s", attrName)
+	default:
+		sb.WriteString("true")
+	}
+}
+
+// findCommonPrincipalAttributes finds attributes that exist on ALL principal types
+// across all actions. Only required attributes with matching types can be safely accessed.
+func (g *PolicyGenerator) findCommonPrincipalAttributes() map[string]string {
+	if len(g.schema.ActionList) == 0 {
+		return nil
+	}
+
+	// Collect all principal types across all actions
+	allPrincipalTypes := make(map[string]bool)
+	for _, actionName := range g.schema.ActionList {
+		action := g.schema.Schema.Actions[actionName]
+		if action.AppliesTo != nil {
+			for _, pt := range action.AppliesTo.PrincipalTypes {
+				allPrincipalTypes[pt] = true
 			}
 		}
 	}
-	sb.WriteString("true")
+
+	if len(allPrincipalTypes) == 0 {
+		return nil
+	}
+
+	// Find attributes common to ALL principal types (must be required and same type)
+	var commonAttrs map[string]string
+	first := true
+	for typeName := range allPrincipalTypes {
+		entityDef, exists := g.schema.Schema.EntityTypes[typeName]
+		if !exists || entityDef.Shape == nil || len(entityDef.Shape.Attributes) == 0 {
+			// This type has no attributes, so there can be no common attributes
+			return nil
+		}
+
+		// Only include required attributes
+		typeAttrs := make(map[string]string)
+		for name, attr := range entityDef.Shape.Attributes {
+			if attr.Required {
+				typeAttrs[name] = attr.Type
+			}
+		}
+
+		if first {
+			commonAttrs = typeAttrs
+			first = false
+		} else {
+			// Intersect with existing common attributes (name AND type must match)
+			for name, existingType := range commonAttrs {
+				if newType, exists := typeAttrs[name]; !exists || newType != existingType {
+					delete(commonAttrs, name)
+				}
+			}
+		}
+
+		if len(commonAttrs) == 0 {
+			return nil
+		}
+	}
+
+	return commonAttrs
 }
 
 func (g *PolicyGenerator) writeContextAccess(sb *strings.Builder, depth int) {
-	// Pick an action and check its context
+	// Find context attributes common to ALL actions (name AND type must match)
+	commonAttrs := g.findCommonContextAttributes()
+	if len(commonAttrs) == 0 {
+		sb.WriteString("true")
+		return
+	}
+
+	// Collect and sort attribute names for determinism
+	var attrNames []string
+	for name := range commonAttrs {
+		attrNames = append(attrNames, name)
+	}
+	slices.Sort(attrNames)
+	attrName := Choose(g.rand, attrNames)
+	attrType := commonAttrs[attrName]
+
+	switch attrType {
+	case "String":
+		fmt.Fprintf(sb, "context.%s == \"%s\"", attrName, g.rand.String(5))
+	case "Long":
+		fmt.Fprintf(sb, "context.%s > %d", attrName, g.rand.IntRange(-100, 100))
+	case "Boolean":
+		fmt.Fprintf(sb, "context.%s", attrName)
+	default:
+		sb.WriteString("true")
+	}
+}
+
+// findCommonContextAttributes finds context attributes that exist on ALL actions
+// with the same name and type. Only required attributes can be safely accessed on `context`.
+func (g *PolicyGenerator) findCommonContextAttributes() map[string]string {
+	if len(g.schema.ActionList) == 0 {
+		return nil
+	}
+
+	var commonAttrs map[string]string
+	first := true
 	for _, actionName := range g.schema.ActionList {
 		action := g.schema.Schema.Actions[actionName]
-		if action.AppliesTo != nil && action.AppliesTo.Context != nil && len(action.AppliesTo.Context.Attributes) > 0 {
-			// Collect and sort attribute names for determinism
-			var attrNames []string
-			for name := range action.AppliesTo.Context.Attributes {
-				attrNames = append(attrNames, name)
-			}
-			slices.Sort(attrNames)
-			if len(attrNames) > 0 {
-				attrName := Choose(g.rand, attrNames)
-				attr := action.AppliesTo.Context.Attributes[attrName]
 
-				switch attr.Type {
-				case "String":
-					fmt.Fprintf(sb, "context.%s == \"%s\"", attrName, g.rand.String(5))
-				case "Long":
-					fmt.Fprintf(sb, "context.%s > %d", attrName, g.rand.IntRange(-100, 100))
-				case "Boolean":
-					fmt.Fprintf(sb, "context.%s", attrName)
-				default:
-					sb.WriteString("true")
+		// Get this action's required context attributes (empty map if no context)
+		typeAttrs := make(map[string]string)
+		if action.AppliesTo != nil && action.AppliesTo.Context != nil {
+			for name, attr := range action.AppliesTo.Context.Attributes {
+				if attr.Required {
+					typeAttrs[name] = attr.Type
 				}
-				return
 			}
 		}
+
+		if first {
+			commonAttrs = typeAttrs
+			first = false
+		} else {
+			// Intersect with existing common attributes (name AND type must match)
+			for name, existingType := range commonAttrs {
+				if newType, exists := typeAttrs[name]; !exists || newType != existingType {
+					delete(commonAttrs, name)
+				}
+			}
+		}
+
+		if len(commonAttrs) == 0 {
+			return nil
+		}
 	}
-	sb.WriteString("true")
+
+	return commonAttrs
 }
 
 func (g *PolicyGenerator) writeHasCheck(sb *strings.Builder) {
-	// Check if principal/resource has an attribute
-	for _, typeName := range g.schema.EntityTypeList {
-		entityDef := g.schema.Schema.EntityTypes[typeName]
-		if entityDef.Shape != nil && len(entityDef.Shape.Attributes) > 0 {
-			// Collect and sort attribute names for determinism
-			var attrNames []string
-			for name := range entityDef.Shape.Attributes {
-				attrNames = append(attrNames, name)
-			}
-			slices.Sort(attrNames)
-			if len(attrNames) > 0 {
-				attrName := Choose(g.rand, attrNames)
-				if g.rand.Bool() {
-					fmt.Fprintf(sb, "principal has %s", attrName)
-				} else {
-					fmt.Fprintf(sb, "resource has %s", attrName)
-				}
-				return
+	// Use common attributes to ensure type safety
+	// has checks are safe even for optional attributes, but the attribute name
+	// must exist on all possible types for the variable
+	usePrincipal := g.rand.Bool()
+
+	var commonAttrs map[string]string
+	if usePrincipal {
+		commonAttrs = g.findCommonPrincipalAttributes()
+	} else {
+		commonAttrs = g.findCommonResourceAttributes()
+	}
+
+	if len(commonAttrs) == 0 {
+		sb.WriteString("true")
+		return
+	}
+
+	var attrNames []string
+	for name := range commonAttrs {
+		attrNames = append(attrNames, name)
+	}
+	slices.Sort(attrNames)
+	attrName := Choose(g.rand, attrNames)
+
+	if usePrincipal {
+		fmt.Fprintf(sb, "principal has %s", attrName)
+	} else {
+		fmt.Fprintf(sb, "resource has %s", attrName)
+	}
+}
+
+// findCommonResourceAttributes finds attributes that exist on ALL resource types
+// across all actions. Only required attributes with matching types can be safely accessed.
+func (g *PolicyGenerator) findCommonResourceAttributes() map[string]string {
+	if len(g.schema.ActionList) == 0 {
+		return nil
+	}
+
+	// Collect all resource types across all actions
+	allResourceTypes := make(map[string]bool)
+	for _, actionName := range g.schema.ActionList {
+		action := g.schema.Schema.Actions[actionName]
+		if action.AppliesTo != nil {
+			for _, rt := range action.AppliesTo.ResourceTypes {
+				allResourceTypes[rt] = true
 			}
 		}
 	}
-	sb.WriteString("true")
+
+	if len(allResourceTypes) == 0 {
+		return nil
+	}
+
+	// Find attributes common to ALL resource types (must be required and same type)
+	var commonAttrs map[string]string
+	first := true
+	for typeName := range allResourceTypes {
+		entityDef, exists := g.schema.Schema.EntityTypes[typeName]
+		if !exists || entityDef.Shape == nil || len(entityDef.Shape.Attributes) == 0 {
+			return nil
+		}
+
+		// Only include required attributes
+		typeAttrs := make(map[string]string)
+		for name, attr := range entityDef.Shape.Attributes {
+			if attr.Required {
+				typeAttrs[name] = attr.Type
+			}
+		}
+
+		if first {
+			commonAttrs = typeAttrs
+			first = false
+		} else {
+			// Intersect with existing common attributes (name AND type must match)
+			for name, existingType := range commonAttrs {
+				if newType, exists := typeAttrs[name]; !exists || newType != existingType {
+					delete(commonAttrs, name)
+				}
+			}
+		}
+
+		if len(commonAttrs) == 0 {
+			return nil
+		}
+	}
+
+	return commonAttrs
 }
 
 func (g *PolicyGenerator) writeInCheck(sb *strings.Builder) {

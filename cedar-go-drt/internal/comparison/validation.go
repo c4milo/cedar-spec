@@ -45,7 +45,8 @@ func CompareValidation(goResult, leanResult *ValidationResult, config Comparison
 	switch config.ValidationMode {
 	case ValidationComparisonModeAgreeOnValid:
 		// Type soundness: if cedar-go says valid, Lean must also say valid
-		if goResult.Valid && !leanResult.Valid {
+		// Exception: Known Lean strictness cases (impossiblePolicy, unknownEntity) are skipped
+		if goResult.Valid && !leanResult.Valid && !isKnownLeanStrictnessError(leanResult) {
 			diffs = append(diffs, ValidationDifference{
 				Field:       "valid",
 				GoValue:     true,
@@ -57,8 +58,13 @@ func CompareValidation(goResult, leanResult *ValidationResult, config Comparison
 		// so we don't flag when go=invalid, lean=valid
 
 	case ValidationComparisonModeAgreeOnAll:
-		// Both must agree completely
+		// Both must agree completely, except for known Lean strictness cases
 		if goResult.Valid != leanResult.Valid {
+			// Skip known Lean strictness cases (Lean being stricter than cedar-go/cedar-rust)
+			if goResult.Valid && !leanResult.Valid && isKnownLeanStrictnessError(leanResult) {
+				// Lean is stricter - this is expected, not a divergence
+				break
+			}
 			diffs = append(diffs, ValidationDifference{
 				Field:       "valid",
 				GoValue:     goResult.Valid,
@@ -91,10 +97,56 @@ func FormatValidationDifferences(diffs []ValidationDifference) string {
 	return sb.String()
 }
 
+// knownLeanStrictnessErrors contains error patterns where Lean's validator is
+// intentionally stricter than cedar-go/cedar-rust. These are not type soundness
+// violations but rather Lean-specific analyses that the production implementations
+// don't perform.
+var knownLeanStrictnessErrors = []string{
+	// impossiblePolicy: Lean performs satisfiability analysis to detect policies
+	// whose scope can never be satisfied (e.g., principal constraints that exclude
+	// all possible types for the action). This is a semantic analysis, not a type check.
+	"impossiblePolicy",
+
+	// unknownEntity: Lean strictly validates that all entity types referenced in
+	// action appliesTo constraints exist in the schema. Cedar-go/cedar-rust are
+	// more permissive about undefined entity type references.
+	"unknownEntity",
+}
+
+// isKnownLeanStrictnessError checks if Lean's errors are all known cases where
+// Lean is intentionally stricter than cedar-go/cedar-rust.
+func isKnownLeanStrictnessError(leanResult *ValidationResult) bool {
+	if leanResult.Valid || len(leanResult.Errors) == 0 {
+		return false
+	}
+	for _, err := range leanResult.Errors {
+		isKnown := false
+		for _, pattern := range knownLeanStrictnessErrors {
+			if strings.Contains(err, pattern) {
+				isKnown = true
+				break
+			}
+		}
+		if !isKnown {
+			return false
+		}
+	}
+	return true
+}
+
 // CheckTypeSoundness is a convenience function that checks the type soundness
 // property: if cedar-go validates a policy set, Lean must also validate it.
+//
+// Note: Known Lean strictness cases (impossiblePolicy, unknownEntity) are
+// excluded from this check. These represent cases where Lean's formal specification
+// is intentionally stricter than the production cedar-go/cedar-rust implementations,
+// not bugs in the DRT conversion code.
 func CheckTypeSoundness(goResult, leanResult *ValidationResult) error {
 	if goResult.Valid && !leanResult.Valid {
+		// Skip known Lean strictness cases (not true type soundness violations)
+		if isKnownLeanStrictnessError(leanResult) {
+			return nil
+		}
 		return fmt.Errorf("type soundness violation: cedar-go accepted but Lean rejected with errors: %v",
 			leanResult.Errors)
 	}

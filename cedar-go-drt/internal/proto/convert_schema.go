@@ -162,25 +162,55 @@ func buildSchemaFromJSON(js jsonSchema) *validator.Schema {
 		ActionDecls: []*validator.ActionDecl{},
 	}
 
+	// First pass: create entity declarations with attributes (but not descendants yet)
+	entityDeclMap := make(map[string]*validator.EntityDecl)
 	for nsName, ns := range js {
 		if ns == nil {
 			continue
 		}
-		appendEntityDecls(result, nsName, ns)
+		for entityName, entity := range ns.EntityTypes {
+			entityDecl := convertEntityDeclWithoutDescendants(nsName, entityName, entity)
+			fullName := resolveFullName(nsName, entityName)
+			entityDeclMap[fullName] = entityDecl
+			result.EntityDecls = append(result.EntityDecls, entityDecl)
+		}
+	}
+
+	// Second pass: populate descendants (inverted from memberOfTypes)
+	// If Type1 has memberOfTypes: ["Type0"], then Type0's descendants include Type1
+	for nsName, ns := range js {
+		if ns == nil {
+			continue
+		}
+		for entityName, entity := range ns.EntityTypes {
+			if entity == nil {
+				continue
+			}
+			childFullName := resolveFullName(nsName, entityName)
+			for _, parentType := range entity.MemberOfTypes {
+				parentFullName := resolveTypeNameInNamespace(nsName, parentType)
+				if parentDecl, ok := entityDeclMap[parentFullName]; ok {
+					parentDecl.Descendants = append(parentDecl.Descendants,
+						convertEntityType(types.EntityType(childFullName)))
+				}
+			}
+		}
+	}
+
+	// Add action declarations
+	for nsName, ns := range js {
+		if ns == nil {
+			continue
+		}
 		appendActionDecls(result, nsName, ns)
 	}
 
 	return result
 }
 
-func appendEntityDecls(result *validator.Schema, nsName string, ns *jsonNamespace) {
-	for entityName, entity := range ns.EntityTypes {
-		entityDecl := convertEntityDecl(nsName, entityName, entity)
-		result.EntityDecls = append(result.EntityDecls, entityDecl)
-	}
-}
-
-func convertEntityDecl(nsName, entityName string, entity *jsonEntity) *validator.EntityDecl {
+// convertEntityDeclWithoutDescendants creates an EntityDecl with attributes but no descendants.
+// Descendants are populated in a second pass after all entity types are created.
+func convertEntityDeclWithoutDescendants(nsName, entityName string, entity *jsonEntity) *validator.EntityDecl {
 	fullName := resolveFullName(nsName, entityName)
 
 	entityDecl := &validator.EntityDecl{
@@ -188,7 +218,6 @@ func convertEntityDecl(nsName, entityName string, entity *jsonEntity) *validator
 		Attributes: make(map[string]*validator.AttributeType),
 	}
 
-	appendMemberOfDescendants(entityDecl, nsName, entity.MemberOfTypes)
 	appendEntityAttributes(entityDecl, nsName, entity.Shape)
 
 	return entityDecl
@@ -206,14 +235,6 @@ func resolveTypeNameInNamespace(nsName, typeName string) string {
 		return nsName + "::" + typeName
 	}
 	return typeName
-}
-
-func appendMemberOfDescendants(entityDecl *validator.EntityDecl, nsName string, memberOfTypes []string) {
-	for _, memberOf := range memberOfTypes {
-		memberName := resolveTypeNameInNamespace(nsName, memberOf)
-		entityDecl.Descendants = append(entityDecl.Descendants,
-			convertEntityType(types.EntityType(memberName)))
-	}
 }
 
 func appendEntityAttributes(entityDecl *validator.EntityDecl, nsName string, shape *jsonType) {
