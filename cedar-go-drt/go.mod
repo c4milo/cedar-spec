@@ -14,7 +14,7 @@
 
 module github.com/cedar-policy/cedar-spec/cedar-go-drt
 
-go 1.24
+go 1.25.0
 
 require (
 	github.com/cedar-policy/cedar-go v1.4.1
