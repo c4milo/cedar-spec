@@ -212,6 +212,7 @@ fuzz-auth: proto
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
 	go test -fuzz='FuzzAuthorization$$' -fuzztime=5m ./fuzz/
 
 ## fuzz-val: Run validation fuzzing
@@ -220,6 +221,7 @@ fuzz-val: proto
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
 	go test -fuzz='FuzzValidation$$' -fuzztime=5m ./fuzz/
 
 ## fuzz-val-strict: Run strict validation fuzzing (requires exact agreement)
@@ -229,6 +231,7 @@ fuzz-val-strict: proto
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
 	go test -fuzz='FuzzValidationStrict$$' -fuzztime=5m ./fuzz/
 
 ## fuzz-eval: Run evaluation fuzzing
@@ -237,6 +240,7 @@ fuzz-eval: proto
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
 	go test -fuzz='^FuzzEvaluation$$' -fuzztime=5m ./fuzz/
 
 ## fuzz-eval-td: Run type-directed evaluation fuzzing
@@ -245,6 +249,7 @@ fuzz-eval-td: proto
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
 	go test -fuzz=FuzzEvaluationTypeDirected -fuzztime=5m ./fuzz/
 
 ## fuzz-entity-val: Run entity validation fuzzing
@@ -253,6 +258,7 @@ fuzz-entity-val: proto
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
 	go test -fuzz=FuzzEntityValidation -fuzztime=5m ./fuzz/
 
 ## fuzz-request-val: Run request validation fuzzing
@@ -261,6 +267,7 @@ fuzz-request-val: proto
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
 	go test -fuzz=FuzzRequestValidation -fuzztime=5m ./fuzz/
 
 ## fuzz-level-val: Run level-based validation fuzzing
@@ -269,6 +276,7 @@ fuzz-level-val: proto
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
 	go test -fuzz=FuzzLevelValidation -fuzztime=5m ./fuzz/
 
 ## fuzz-auth-td: Run type-directed authorization fuzzing
@@ -277,6 +285,7 @@ fuzz-auth-td: proto
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
 	go test -fuzz=FuzzAuthorizationTypeDirected -fuzztime=5m ./fuzz/
 
 ## fuzz-val-td: Run type-directed validation fuzzing
@@ -285,6 +294,7 @@ fuzz-val-td: proto
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
 	go test -fuzz=FuzzValidationTypeDirected -fuzztime=5m ./fuzz/
 
 ## fuzz-batch: Run batched evaluation fuzzing (property-based, no Lean FFI calls but needs CGO for build)
@@ -292,6 +302,7 @@ fuzz-batch: proto
 	CGO_ENABLED=1 \
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(SMT_ENV) \
 	go test -fuzz=FuzzBatchedEvaluation -fuzztime=5m ./fuzz/
 
 ## fuzz-roundtrip: Run roundtrip fuzzing (no Lean FFI calls but needs CGO for build)
@@ -299,14 +310,17 @@ fuzz-roundtrip: proto
 	CGO_ENABLED=1 \
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(SMT_ENV) \
 	go test -fuzz=FuzzPolicyRoundtrip -fuzztime=2m ./fuzz/
 	CGO_ENABLED=1 \
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(SMT_ENV) \
 	go test -fuzz=FuzzSchemaRoundtrip -fuzztime=2m ./fuzz/
 	CGO_ENABLED=1 \
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(SMT_ENV) \
 	go test -fuzz=FuzzPolicySetRoundtrip -fuzztime=2m ./fuzz/
 
 ## fuzz-rbac: Run RBAC role hierarchy fuzzing
@@ -315,6 +329,7 @@ fuzz-rbac: proto
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
 	go test -fuzz='^FuzzRBAC$$' -fuzztime=5m ./fuzz/
 
 ## fuzz-rbac-authorizer: Run abstract policy combination fuzzing
@@ -323,6 +338,7 @@ fuzz-rbac-authorizer: proto
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
 	go test -fuzz=FuzzRBACAuthorizer -fuzztime=5m ./fuzz/
 
 ## fuzz-batch-drt: Run batched evaluation DRT (compares against Lean)
@@ -331,6 +347,7 @@ fuzz-batch-drt: proto
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
 	go test -fuzz=FuzzBatchedEvaluationDRT -fuzztime=5m ./fuzz/
 
 ## fuzz-proto-roundtrip: Run protobuf roundtrip fuzzing
@@ -339,6 +356,7 @@ fuzz-proto-roundtrip: proto
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
 	go test -fuzz=FuzzProtobufRoundtrip -fuzztime=5m ./fuzz/
 
 ## fuzz-val-pbt: Run validation property-based testing
@@ -347,6 +365,7 @@ fuzz-val-pbt: proto
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
 	go test -fuzz='^FuzzValidationPBT$$' -fuzztime=5m ./fuzz/
 
 ## fuzz-val-pbt-td: Run validation PBT type-directed
@@ -355,6 +374,7 @@ fuzz-val-pbt-td: proto
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
 	go test -fuzz=FuzzValidationPBTTypeDirected -fuzztime=5m ./fuzz/
 
 ## fuzz-wildcard: Run wildcard pattern matching fuzzing (no Lean FFI calls but needs CGO for build)
@@ -362,6 +382,7 @@ fuzz-wildcard: proto
 	CGO_ENABLED=1 \
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(SMT_ENV) \
 	go test -fuzz=FuzzWildcardMatching -fuzztime=2m ./fuzz/
 
 ## fuzz-partial-eval: Run partial evaluation soundness fuzzing
@@ -370,6 +391,7 @@ fuzz-partial-eval: proto
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
 	go test -fuzz=FuzzPartialEvaluation -fuzztime=5m ./fuzz/
 
 ## fuzz-partial-eval-pbt: Run partial evaluation property-based testing
@@ -378,6 +400,7 @@ fuzz-partial-eval-pbt: proto
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
 	go test -fuzz=FuzzPartialEvaluationPBT -fuzztime=5m ./fuzz/
 
 ## fuzz-partial-eval-drt: Run partial evaluation DRT (compares cedar-go against Lean)
@@ -386,6 +409,7 @@ fuzz-partial-eval-drt: proto
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
 	go test -fuzz=FuzzPartialEvaluationDRT -fuzztime=5m ./fuzz/
 
 ## fuzz-residual-set-drt: Run ResidualSet API DRT (compares cedar-go against Lean)
@@ -394,6 +418,7 @@ fuzz-residual-set-drt: proto
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
 	go test -fuzz=FuzzResidualSetDRT -fuzztime=5m ./fuzz/
 
 ## fuzz-policy-cedar-to-json: Run policy Cedar->JSON conversion fuzzing (no Lean FFI calls but needs CGO for build)
@@ -401,6 +426,7 @@ fuzz-policy-cedar-to-json: proto
 	CGO_ENABLED=1 \
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(SMT_ENV) \
 	go test -fuzz=FuzzPolicyCedarToJSON -fuzztime=2m ./fuzz/
 
 ## fuzz-policy-json-to-cedar: Run policy JSON->Cedar conversion fuzzing (no Lean FFI calls but needs CGO for build)
@@ -408,6 +434,7 @@ fuzz-policy-json-to-cedar: proto
 	CGO_ENABLED=1 \
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(SMT_ENV) \
 	go test -fuzz=FuzzPolicyJSONToCedar -fuzztime=2m ./fuzz/
 
 ## fuzz-tpe-query-principal: Run TPE principal query fuzzing
@@ -416,6 +443,7 @@ fuzz-tpe-query-principal: proto
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
 	go test -fuzz=FuzzTPEQueryPrincipal -fuzztime=5m ./fuzz/
 
 ## fuzz-tpe-query-resource: Run TPE resource query fuzzing
@@ -424,6 +452,7 @@ fuzz-tpe-query-resource: proto
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
 	go test -fuzz=FuzzTPEQueryResource -fuzztime=5m ./fuzz/
 
 ## fuzz-tpe-query-action: Run TPE action query fuzzing
@@ -432,6 +461,7 @@ fuzz-tpe-query-action: proto
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
 	go test -fuzz=FuzzTPEQueryAction -fuzztime=5m ./fuzz/
 
 ## fuzz-entity-slicing: Run entity slicing fuzzing
@@ -440,6 +470,7 @@ fuzz-entity-slicing: proto
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
 	go test -fuzz=FuzzEntitySlicing -fuzztime=5m ./fuzz/
 
 ## fuzz-schema-resolution: Run schema resolution fuzzing
@@ -448,6 +479,7 @@ fuzz-schema-resolution: proto
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
 	go test -fuzz=FuzzSchemaResolution -fuzztime=5m ./fuzz/
 
 ## fuzz-input-generation: Run input generation fuzzing
@@ -456,6 +488,7 @@ fuzz-input-generation: proto
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
 	go test -fuzz='FuzzInputGeneration$$' -fuzztime=5m ./fuzz/
 
 ## fuzz-parser-crash: Run parser crash testing (no Lean FFI calls, but needs CGO for build)
@@ -464,14 +497,17 @@ fuzz-parser-crash: proto
 	CGO_ENABLED=1 \
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(SMT_ENV) \
 	go test -fuzz=FuzzPolicyParserCrash -fuzztime=2m ./fuzz/
 	CGO_ENABLED=1 \
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(SMT_ENV) \
 	go test -fuzz=FuzzSchemaParser -fuzztime=2m ./fuzz/
 	CGO_ENABLED=1 \
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(SMT_ENV) \
 	go test -fuzz=FuzzEntityUIDParser -fuzztime=2m ./fuzz/
 
 ## fuzz-schema-parser: Run schema parser crash testing (no Lean FFI calls, but needs CGO for build)
@@ -479,6 +515,7 @@ fuzz-schema-parser: proto
 	CGO_ENABLED=1 \
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(SMT_ENV) \
 	go test -fuzz=FuzzSchemaParser -fuzztime=2m ./fuzz/
 
 ## fuzz-schema-wf: Run schema well-formedness DRT (compares cedar-go against Lean)
@@ -488,6 +525,7 @@ fuzz-schema-wf: proto
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
 	go test -fuzz='FuzzSchemaWellFormedness$$' -fuzztime=5m ./fuzz/
 
 ## fuzz-schema-wf-td: Run type-directed schema well-formedness DRT
@@ -496,6 +534,7 @@ fuzz-schema-wf-td: proto
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
 	go test -fuzz=FuzzSchemaWellFormednessTypeDirected -fuzztime=5m ./fuzz/
 
 ## fuzz-forbid-trumps: Run forbid_trumps_permit theorem fuzzing (property-based)
@@ -504,6 +543,7 @@ fuzz-forbid-trumps: proto
 	CGO_ENABLED=1 \
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(SMT_ENV) \
 	go test -fuzz=FuzzForbidTrumpsPermit -fuzztime=2m ./fuzz/
 
 ## fuzz-default-deny: Run default_deny theorem fuzzing (property-based)
@@ -512,6 +552,7 @@ fuzz-default-deny: proto
 	CGO_ENABLED=1 \
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(SMT_ENV) \
 	go test -fuzz=FuzzDefaultDeny -fuzztime=2m ./fuzz/
 
 ## fuzz-order-dup: Run order_and_dup_independent theorem fuzzing (property-based)
@@ -520,6 +561,7 @@ fuzz-order-dup: proto
 	CGO_ENABLED=1 \
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(SMT_ENV) \
 	go test -fuzz=FuzzOrderAndDupIndependent -fuzztime=2m ./fuzz/
 
 ## fuzz-tpe-drt: Run TPE DRT (compares cedar-go batch evaluation against Lean TPE)
@@ -528,6 +570,7 @@ fuzz-tpe-drt: proto
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
 	go test -fuzz='^FuzzTPEDRT$$' -fuzztime=5m ./fuzz/
 
 ## fuzz-tpe-soundness: Run TPE soundness fuzzing (batch result matches full evaluation)
@@ -536,6 +579,7 @@ fuzz-tpe-soundness: proto
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
 	go test -fuzz=FuzzTPESoundness -fuzztime=5m ./fuzz/
 
 ## fuzz-tpe-reauth: Run TPE reauthorize fuzzing (partial eval + full eval must match)
@@ -543,6 +587,7 @@ fuzz-tpe-reauth: proto
 	CGO_ENABLED=1 \
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(SMT_ENV) \
 	go test -fuzz=FuzzTPEResidualReauthorize -fuzztime=5m ./fuzz/
 
 ## fuzz-symcc-never-errors: Run SymCC neverErrors fuzzing (requires cvc5)
