@@ -8,8 +8,9 @@ This module provides:
 
 - **CGO bindings** to call Lean FFI functions from Go
 - **Comparison logic** to detect behavioral differences between implementations
-- **47 fuzz targets** using Go's native fuzzing framework
+- **66 fuzz targets** using Go's native fuzzing framework across 31 test files
 - **Type-directed input generation** for well-typed random testing
+- **SymCC/SMT analysis** for symbolic verification of policy properties
 - **CLI tool** for manual testing
 - **Corpus expansion tools** with edge case generation
 
@@ -19,17 +20,16 @@ This module provides:
 - [elan](https://github.com/leanprover/elan) (Lean toolchain manager)
 - `protoc` with `protoc-gen-go`
 - Lean libraries built (see below)
+- [cvc5](https://cvc5.github.io/) (optional, for SymCC SMT analysis)
 
 ## Building
 
-### 1. Build Lean Libraries
+**Always use `make build` instead of `go build ./...`** — the Makefile sets required CGO environment variables for Lean FFI.
 
-First, build the Lean static libraries:
+### 1. Build Lean Libraries
 
 ```bash
 make lean
-# Or manually:
-cd ../cedar-lean && lake build CedarFFI:static
 ```
 
 ### 2. Generate Protobuf Code
@@ -49,20 +49,26 @@ make build
 ### Running Fuzz Tests
 
 ```bash
-# Authorization fuzzing (5 minutes)
+# Authorization fuzzing (cedar-go vs Lean)
 make fuzz-auth
-
-# Type-directed authorization fuzzing
-make fuzz-auth-td
-
-# Validation fuzzing (5 minutes)
-make fuzz-val
 
 # Strict validation fuzzing (requires exact agreement)
 make fuzz-val-strict
 
-# All fuzz targets
-make fuzz-all
+# Pure Go tests (no Lean runtime needed)
+make fuzz-roundtrip
+make fuzz-wildcard
+make fuzz-parser-crash
+
+# Authorization theorems (property-based, no Lean)
+make fuzz-forbid-trumps
+make fuzz-default-deny
+
+# SymCC SMT analysis (requires cvc5)
+ulimit -n 10240 && make fuzz-symcc-all
+
+# See all targets
+make help
 ```
 
 ### Corpus Management
@@ -94,7 +100,9 @@ make run-drt ARGS='-validate -policy policy.cedar -schema schema.cedarschema'
 ### Unit Tests
 
 ```bash
-make test
+make test          # Internal package tests
+make test-fuzz     # Fuzz package non-fuzz tests (excludes SymCC)
+make test-symcc    # SymCC unit tests (requires cvc5)
 ```
 
 ## Project Structure
@@ -103,58 +111,69 @@ make test
 cedar-go-drt/
 ├── cmd/
 │   ├── drt/                  # CLI tool for manual DRT testing
-│   │   └── main.go
 │   └── init-corpus/          # Corpus initialization tool
-│       └── main.go
-├── fuzz/                     # Fuzz targets (47 total)
+├── fuzz/                     # Fuzz targets (66 across 31 files)
 │   ├── authorization_test.go
+│   ├── authorization_theorems_test.go
 │   ├── authorization_type_directed_test.go
-│   ├── batch_authorization_test.go
-│   ├── batch_evaluation_drt_test.go
+│   ├── batch_evaluation_test.go
+│   ├── batched_evaluation_drt_test.go
 │   ├── entity_slicing_test.go
 │   ├── entity_validation_test.go
 │   ├── evaluation_test.go
 │   ├── evaluation_type_directed_test.go
 │   ├── input_generation_test.go
 │   ├── level_validation_test.go
-│   ├── partial_eval_soundness_test.go
-│   ├── policy_cedar_to_json_test.go
-│   ├── policy_json_to_cedar_test.go
+│   ├── partial_evaluation_test.go
+│   ├── partial_evaluation_drt_test.go
+│   ├── policy_conversion_test.go
+│   ├── protobuf_roundtrip_test.go
 │   ├── rbac_test.go
 │   ├── rbac_authorizer_test.go
 │   ├── request_validation_test.go
 │   ├── roundtrip_test.go
+│   ├── roundtrip_extended_test.go
 │   ├── schema_resolution_test.go
-│   ├── symcc_cex_pbt_test.go
-│   ├── tpe_query_action_test.go
-│   ├── tpe_query_principal_test.go
-│   ├── tpe_query_resource_test.go
+│   ├── schema_wellformedness_test.go
+│   ├── simple_parser_test.go
+│   ├── symcc_test.go
+│   ├── tpe_drt_test.go
+│   ├── tpe_query_test.go
 │   ├── validation_test.go
 │   ├── validation_pbt_test.go
 │   ├── validation_strict_test.go
 │   ├── validation_type_directed_test.go
-│   ├── wildcard_test.go
+│   ├── wildcard_matching_test.go
 │   └── testdata/             # Seed corpus
 ├── internal/
 │   ├── lean/                 # CGO bindings to Lean
 │   │   ├── cgo.go            # CGO declarations
 │   │   ├── init.go           # Lean runtime initialization
 │   │   ├── object.go         # Lean object memory management
-│   │   └── ffi.go            # High-level FFI functions
+│   │   ├── ffi.go            # High-level FFI functions
+│   │   └── symcc.go          # SymCC FFI bindings
 │   ├── proto/                # Protobuf conversion
-│   │   ├── convert.go        # cedar-go types <-> protobuf
-│   │   └── convert_test.go   # Unit tests
+│   │   ├── convert.go        # cedar-go types → protobuf (authorization)
+│   │   ├── convert_expr.go   # Expression conversion
+│   │   ├── convert_schema.go # Schema conversion
+│   │   ├── convert_symcc.go  # SymCC request conversion
+│   │   └── convert_test.go
 │   ├── comparison/           # Result comparison
 │   │   ├── modes.go          # Comparison modes
-│   │   ├── authorization.go
-│   │   └── validation.go
+│   │   ├── authorization.go  # Authorization result comparison
+│   │   └── validation.go     # Validation result comparison
 │   ├── corpus/               # Test data loading
 │   │   ├── loader.go         # Corpus loading from files
-│   │   ├── loader_test.go    # Unit tests
 │   │   ├── generated.go      # Type-directed & edge case generation
-│   │   └── generated_test.go # Unit tests
+│   │   └── validation.go     # Validation corpus loading
 │   └── typegen/              # Type-directed input generation
-│       └── generator.go
+│       ├── input.go          # Generated input types
+│       ├── schema.go         # Schema generation
+│       ├── entity.go         # Entity generation
+│       ├── policy.go         # Policy generation
+│       ├── request.go        # Request generation
+│       ├── rand.go           # Random utilities
+│       └── settings.go       # Generator configuration
 ├── go.mod
 ├── Makefile
 └── README.md
@@ -162,62 +181,133 @@ cedar-go-drt/
 
 ## Fuzz Targets
 
+### Authorization Theorems (No Lean Required)
+
+Property-based tests verifying Lean authorization theorems hold in cedar-go:
+
+| Make Target | Fuzz Function | Description |
+|-------------|---------------|-------------|
+| `fuzz-forbid-trumps` | `FuzzForbidTrumpsPermit` | Forbid always overrides permit |
+| `fuzz-default-deny` | `FuzzDefaultDeny` | Deny if no permit satisfied |
+| `fuzz-order-dup` | `FuzzOrderAndDupIndependent` | Order/duplicates don't affect result |
+
 ### Authorization (Lean Required)
 
-| Make Target | Test File | Description |
-|-------------|-----------|-------------|
-| `fuzz-auth` | `authorization_test.go` | Basic authorization DRT |
-| `fuzz-auth-td` | `authorization_type_directed_test.go` | Type-directed authorization |
-| `fuzz-rbac` | `rbac_test.go` | RBAC role hierarchy testing |
-| `fuzz-rbac-authorizer` | `rbac_authorizer_test.go` | Abstract policy combinations |
-| `fuzz-batch-drt` | `batch_evaluation_drt_test.go` | Batch evaluation vs Lean |
+| Make Target | Fuzz Function | Description |
+|-------------|---------------|-------------|
+| `fuzz-auth` | `FuzzAuthorization` | Basic authorization DRT |
+| `fuzz-auth-td` | `FuzzAuthorizationTypeDirected` | Type-directed authorization |
+| `fuzz-rbac` | `FuzzRBAC` | RBAC role hierarchy testing |
+| `fuzz-rbac-authorizer` | `FuzzRBACAuthorizer` | Abstract policy combinations |
 
 ### Validation (Lean Required)
 
-| Make Target | Test File | Description |
-|-------------|-----------|-------------|
-| `fuzz-val` | `validation_test.go` | Basic validation DRT (type soundness) |
-| `fuzz-val-strict` | `validation_strict_test.go` | Strict validation (exact agreement) |
-| `fuzz-val-td` | `validation_type_directed_test.go` | Type-directed validation |
-| `fuzz-val-pbt` | `validation_pbt_test.go` | Property-based validation |
-| `fuzz-entity-val` | `entity_validation_test.go` | Entity validation |
-| `fuzz-request-val` | `request_validation_test.go` | Request validation |
-| `fuzz-level-val` | `level_validation_test.go` | Level-based validation |
+| Make Target | Fuzz Function | Description |
+|-------------|---------------|-------------|
+| `fuzz-val` | `FuzzValidation` | Basic validation DRT (type soundness) |
+| `fuzz-val-strict` | `FuzzValidationStrict` | Strict validation (exact agreement) |
+| `fuzz-val-td` | `FuzzValidationTypeDirected` | Type-directed validation |
+| `fuzz-val-pbt` | `FuzzValidationPBT` | Property-based validation |
+| `fuzz-val-pbt-td` | `FuzzValidationPBTTypeDirected` | Type-directed validation PBT |
+| `fuzz-entity-val` | `FuzzEntityValidation` | Entity validation |
+| `fuzz-request-val` | `FuzzRequestValidation` | Request validation |
+| `fuzz-level-val` | `FuzzLevelValidation` | Level-based validation |
 
 ### Evaluation (Lean Required)
 
-| Make Target | Test File | Description |
-|-------------|-----------|-------------|
-| `fuzz-eval` | `evaluation_test.go` | Basic evaluation DRT |
-| `fuzz-eval-td` | `evaluation_type_directed_test.go` | Type-directed evaluation |
-| `fuzz-partial-eval` | `partial_eval_soundness_test.go` | Partial evaluation soundness |
+| Make Target | Fuzz Function | Description |
+|-------------|---------------|-------------|
+| `fuzz-eval` | `FuzzEvaluation` | Basic evaluation DRT |
+| `fuzz-eval-td` | `FuzzEvaluationTypeDirected` | Type-directed evaluation |
+| `fuzz-batch-drt` | `FuzzBatchedEvaluationDRT` | Batch evaluation vs Lean |
+
+### Schema Well-Formedness (Lean Required)
+
+| Make Target | Fuzz Function | Description |
+|-------------|---------------|-------------|
+| `fuzz-schema-wf` | `FuzzSchemaWellFormedness` | Schema well-formedness DRT |
+| `fuzz-schema-wf-td` | `FuzzSchemaWellFormednessTypeDirected` | Type-directed schema WF |
+
+### TPE / Partial Evaluation (Lean Required)
+
+| Make Target | Fuzz Function | Description |
+|-------------|---------------|-------------|
+| `fuzz-tpe-drt` | `FuzzTPEDRT` | TPE DRT (cedar-go batch vs Lean TPE) |
+| `fuzz-tpe-soundness` | `FuzzTPESoundness` | Batch result matches full evaluation |
+| `fuzz-tpe-reauth` | `FuzzTPEResidualReauthorize` | Partial eval + full eval must match |
+| `fuzz-tpe-query-principal` | `FuzzTPEQueryPrincipal` | Batch with variable principal |
+| `fuzz-tpe-query-resource` | `FuzzTPEQueryResource` | Batch with variable resource |
+| `fuzz-tpe-query-action` | `FuzzTPEQueryAction` | Batch with variable action |
+| `fuzz-partial-eval` | `FuzzPartialEvaluation` | Partial evaluation soundness |
+| `fuzz-partial-eval-pbt` | `FuzzPartialEvaluationPBT` | Partial evaluation PBT |
+| `fuzz-partial-eval-drt` | `FuzzPartialEvaluationDRT` | Partial evaluation DRT vs Lean |
+| `fuzz-residual-set-drt` | `FuzzResidualSetDRT` | ResidualSet API DRT vs Lean |
+
+### Parser Crash Testing (No Lean Required)
+
+| Make Target | Fuzz Function | Description |
+|-------------|---------------|-------------|
+| `fuzz-parser-crash` | `FuzzPolicyParserCrash`, `FuzzSchemaParser`, `FuzzEntityUIDParser` | Parsers don't panic on arbitrary input |
+| `fuzz-schema-parser` | `FuzzSchemaParser` | Schema parser crash testing |
+
+Additional parser fuzz targets (no dedicated make target):
+- `FuzzSimpleParserString` — String parser crash testing
+- `FuzzSimpleParser` — General parser crash testing
+
+### Roundtrip (No Lean Required)
+
+| Make Target | Fuzz Function | Description |
+|-------------|---------------|-------------|
+| `fuzz-roundtrip` | `FuzzPolicyRoundtrip`, `FuzzSchemaRoundtrip`, `FuzzPolicySetRoundtrip` | Policy/Schema/PolicySet roundtrip |
+| `fuzz-policy-cedar-to-json` | `FuzzPolicyCedarToJSON`, `FuzzPolicySetCedarToJSON` | Cedar → JSON conversion |
+| `fuzz-policy-json-to-cedar` | `FuzzPolicyJSONToCedar` | JSON → Cedar conversion |
+| `fuzz-proto-roundtrip` | `FuzzProtobufRoundtrip`, `FuzzProtobufPolicyRoundtrip` | Protobuf roundtrip |
+
+Additional roundtrip fuzz targets (no dedicated make target):
+- `FuzzJSONSchemaRoundtrip` — JSON schema roundtrip
+- `FuzzSchemaCedarToJSON` — Schema Cedar → JSON
+- `FuzzSchemaJSONToCedar` — Schema JSON → Cedar
+- `FuzzEntitiesRoundtrip` — Entities JSON roundtrip
+- `FuzzEntitiesRoundtripBytes` — Entities roundtrip from bytes
+- `FuzzFormatter` — Policy formatter consistency
+- `FuzzFormatterBytes` — Formatter from arbitrary bytes
+- `FuzzGeneralRoundtrip` — General parse/format roundtrip
 
 ### Pure Go (No Lean Required)
 
-| Make Target | Test File | Description |
-|-------------|-----------|-------------|
-| `fuzz-batch` | `batch_authorization_test.go` | Batch evaluation consistency |
-| `fuzz-roundtrip` | `roundtrip_test.go` | Policy/Schema roundtrip |
-| `fuzz-wildcard` | `wildcard_test.go` | Wildcard pattern matching |
-| `fuzz-policy-cedar-to-json` | `policy_cedar_to_json_test.go` | Cedar→JSON conversion |
-| `fuzz-policy-json-to-cedar` | `policy_json_to_cedar_test.go` | JSON→Cedar conversion |
-| `fuzz-input-generation` | `input_generation_test.go` | Generator produces valid inputs |
+| Make Target | Fuzz Function | Description |
+|-------------|---------------|-------------|
+| `fuzz-batch` | `FuzzBatchedEvaluation` | Batch evaluation consistency |
+| `fuzz-wildcard` | `FuzzWildcardMatching` | Wildcard pattern matching |
+| `fuzz-input-generation` | `FuzzInputGeneration` | Generator produces valid inputs |
 
-### TPE/Partial Evaluation
-
-| Make Target | Test File | Description |
-|-------------|-----------|-------------|
-| `fuzz-tpe-query-principal` | `tpe_query_principal_test.go` | Batch with variable principal |
-| `fuzz-tpe-query-resource` | `tpe_query_resource_test.go` | Batch with variable resource |
-| `fuzz-tpe-query-action` | `tpe_query_action_test.go` | Batch with variable action |
+Additional pure Go fuzz targets (no dedicated make target):
+- `FuzzInputGenerationDiversity` — Generator output diversity
+- `FuzzInputGenerationStress` — Generator stress testing
 
 ### Entity & Schema
 
-| Make Target | Test File | Description |
-|-------------|-----------|-------------|
-| `fuzz-entity-slicing` | `entity_slicing_test.go` | Sliced entities preserve decisions |
-| `fuzz-schema-resolution` | `schema_resolution_test.go` | JSON/Cedar schema equivalence |
-| `fuzz-symcc-cex-pbt` | `symcc_cex_pbt_test.go` | Symbolic counterexample testing |
+| Make Target | Fuzz Function | Description |
+|-------------|---------------|-------------|
+| `fuzz-entity-slicing` | `FuzzEntitySlicing`, `FuzzEntitySlicingExtended` | Sliced entities preserve decisions |
+| `fuzz-schema-resolution` | `FuzzSchemaResolution`, `FuzzSchemaEquivalence` | JSON/Cedar schema equivalence |
+
+### SymCC / SMT Analysis (Lean + cvc5 Required)
+
+| Make Target | Fuzz Function | Description |
+|-------------|---------------|-------------|
+| `fuzz-symcc-never-errors` | `FuzzSymCCNeverErrors` | Policies don't produce evaluation errors |
+| `fuzz-symcc-always-matches` | `FuzzSymCCAlwaysMatches` | Policy conditions always evaluate to true |
+| `fuzz-symcc-never-matches` | `FuzzSymCCNeverMatches` | Policy conditions never evaluate to true |
+| `fuzz-symcc-always-allows` | `FuzzSymCCAlwaysAllows` | Policy sets always allow requests |
+| `fuzz-symcc-always-denies` | `FuzzSymCCAlwaysDenies` | Policy sets always deny requests |
+| `fuzz-symcc-matches-equiv` | `FuzzSymCCMatchesEquivalent` | Two policies have equivalent conditions |
+| `fuzz-symcc-matches-implies` | `FuzzSymCCMatchesImplies` | One policy's condition implies another's |
+| `fuzz-symcc-equiv` | `FuzzSymCCEquivalent` | Two policy sets are equivalent |
+| `fuzz-symcc-implies` | `FuzzSymCCImplies` | One policy set implies another |
+| `fuzz-symcc-all` | _(runs stable targets)_ | Runs `FuzzSymCCNeverErrors` only |
+
+> **Note:** Some SymCC targets can cause cvc5 to hang on complex SMT queries. `FuzzSymCCNeverErrors` is the most stable target.
 
 ## Comparison Modes
 
@@ -229,8 +319,8 @@ cedar-go-drt/
 
 ### Validation Comparison
 
-- **ValidationComparisonModeAgreeOnValid**: If cedar-go validates, Lean must validate (type soundness) - *default*
-- **ValidationComparisonModeAgreeOnAll**: Both must agree on all outcomes - *strict mode*
+- **ValidationComparisonModeAgreeOnValid**: If cedar-go validates, Lean must validate (type soundness) — *default*
+- **ValidationComparisonModeAgreeOnAll**: Both must agree on all outcomes — *strict mode*
 
 #### Strict Validation Mode
 
@@ -238,8 +328,6 @@ The `fuzz-val-strict` target uses `ValidationComparisonModeAgreeOnAll` which req
 
 - **cedar-go is overly permissive**: accepts policies that Lean rejects
 - **cedar-go is overly strict**: rejects policies that Lean accepts
-
-Use strict mode to find places where cedar-go validation differs from the formal specification, even when cedar-go is being conservative.
 
 ## Corpus Generation
 
@@ -276,25 +364,6 @@ go run ./cmd/init-corpus -edge-cases
 go run ./cmd/init-corpus -generate=250 -edge-cases -output ./fuzz/testdata/fuzz/FuzzAuthorization
 ```
 
-### Edge Cases Covered
-
-The edge case generator includes:
-
-- Empty policy sets
-- Forbid trumps permit scenarios
-- Multiple matching policies
-- Entity hierarchies (principal/resource in groups)
-- Context attribute conditions
-- Resource containment hierarchies
-- Action sets
-- Unless conditions
-- IP address extension usage
-- Decimal extension usage
-- `has` operator with `like` patterns
-- Set `contains` operations
-- Record attribute access
-- Deeply nested entity hierarchies
-
 ## Architecture
 
 ```
@@ -308,7 +377,7 @@ The edge case generator includes:
 │   (native Go)     │   (FFI via C)       │
 ├───────────────────┼─────────────────────┤
 │                   │   Protobuf          │
-│                   │   (convert.go)      │
+│                   │   (convert*.go)     │
 └───────────────────┴─────────────────────┘
                     │
                     ▼
@@ -332,32 +401,47 @@ Lean requires careful thread management:
 If a fuzz test finds a divergence:
 
 1. The failing input is saved in `testdata/fuzz/<target>/`
-2. Run the CLI with verbose output to see detailed comparison
-3. Check if it's a known difference or a real bug
-
-```bash
-# Debug a specific failing input
-go test -run=FuzzAuthorization/failing_input_name ./fuzz/
-```
+2. Reproduce with the exact test case:
+   ```bash
+   go test -run=FuzzAuthorization/failing_input_name ./fuzz/
+   ```
+3. Use the CLI with verbose output for detailed comparison:
+   ```bash
+   make run-drt ARGS='-policy failing.cedar -entities failing_entities.json -request failing_request.json -verbose'
+   ```
 
 ## Key Properties Tested
 
 1. **Type Soundness**: If cedar-go validates, Lean must validate
 2. **Authorization Correctness**: Same decision (Allow/Deny) and determining policies
-3. **Forbid Trumps Permit**: Forbid policies override permits
-4. **Entity Hierarchy**: `in` operator respects transitive parent relationships
-5. **Roundtrip Consistency**: Cedar→JSON→Cedar preserves semantics
-6. **Batch Consistency**: Batch results match individual authorization
+3. **Forbid Trumps Permit**: Forbid policies always override permits
+4. **Default Deny**: No permit satisfied implies deny
+5. **Order Independence**: Policy order and duplicates don't affect authorization
+6. **Entity Hierarchy**: `in` operator respects transitive parent relationships
+7. **Roundtrip Consistency**: Cedar → JSON → Cedar preserves semantics
+8. **Batch Consistency**: Batch results match individual authorization
+9. **TPE Soundness**: Partial evaluation matches full evaluation
+10. **SymCC Properties**: SMT-verified policy analysis (never errors, equivalence, implication)
 
-## Known Differences
+## Common Issues
 
-Some differences between cedar-go and Lean are expected:
+### "lean/lean.h not found"
+Use `make build` instead of `go build ./...`
 
-- Error message formatting may differ
-- Validation strictness levels may vary
-- Extension function edge cases
+### "undefined symbol: lean_*"
+Lean libraries not built. Run `make lean` first.
 
-These are handled via comparison modes in the configuration.
+### "library not loaded: libleanshared.dylib"
+Runtime library path not set. Use Makefile targets which set `DYLD_FALLBACK_LIBRARY_PATH`.
+
+### "No SMT solver found" (SymCC targets only)
+Install cvc5: `brew install cvc5` or from [cvc5.github.io](https://cvc5.github.io/)
+
+### "too many open files" during fuzzing
+Increase the file descriptor limit: `ulimit -n 10240`
+
+### Fuzz test hangs
+Some Lean operations are slow. Use `-fuzztime=1m` for quick iteration. Some SymCC targets can cause cvc5 to hang on complex SMT queries — `FuzzSymCCNeverErrors` is the most stable.
 
 ## Contributing
 
@@ -365,4 +449,4 @@ See [CONTRIBUTING.md](../CONTRIBUTING.md) in the parent repository.
 
 ## License
 
-Apache 2.0 - see [LICENSE](../LICENSE)
+Apache 2.0 — see [LICENSE](../LICENSE)

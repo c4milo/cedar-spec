@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("{\"sChemA\":\"{\\\"\\\":{\\\"entitYTYpes\\\":{\\\"User\\\":{\\\"shApe\\\":{\\\"AttriButes\\\":{\\\"active\\\":{\\\"tYpe\\\":\\\"0\\\",\\\"required\\\":true}}}}},\\\"ACtions\\\":{\\\"\\\":{\\\"AppliesTo\\\":{\\\"prinCipAlTYpes\\\":[\\\"User\\\"],\\\"resourCeTYpes\\\":[\\\"A\\\"]}}}}}\",\"poliCies\":[\"permit(principal,action,resource)when{principal.active};\"]}")

@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("permit(principal==A::\"\b\",action,resource);")
