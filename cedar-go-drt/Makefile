@@ -464,6 +464,33 @@ fuzz-tpe-query-action: proto
 	$(SMT_ENV) \
 	go test -fuzz=FuzzTPEQueryAction -fuzztime=5m ./fuzz/
 
+## fuzz-tpe-query-multi: Run TPE multi-variable query fuzzing (Lean required)
+fuzz-tpe-query-multi: proto
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
+	go test -fuzz=FuzzTPEQueryMultiVariable -fuzztime=5m ./fuzz/
+
+## fuzz-tpe-query-context: Run TPE context query fuzzing (Lean required)
+fuzz-tpe-query-context: proto
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
+	go test -fuzz='^FuzzTPEQueryContext$$' -fuzztime=5m ./fuzz/
+
+## fuzz-tpe-query-context-field: Run TPE context field query fuzzing (Lean required)
+fuzz-tpe-query-context-field: proto
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
+	go test -fuzz=FuzzTPEQueryContextField -fuzztime=5m ./fuzz/
+
 ## fuzz-entity-slicing: Run entity slicing fuzzing
 fuzz-entity-slicing: proto
 	CGO_ENABLED=1 \

@@ -110,7 +110,7 @@ Compares cedar-go vs Lean results:
 - `CompareValidation()` - Valid/invalid with error messages
 - `CheckTypeSoundness()` - If cedar-go accepts, Lean must too
 
-## Fuzz Targets (66 total)
+## Fuzz Targets (69 total)
 
 ### Authorization Theorems (No Lean Required) ⚡
 Property-based tests verifying Lean authorization theorems:
@@ -177,6 +177,9 @@ Property-based tests verifying Lean authorization theorems:
 | `fuzz-tpe-query-principal` | Batch with variable principal |
 | `fuzz-tpe-query-resource` | Batch with variable resource |
 | `fuzz-tpe-query-action` | Batch with variable action |
+| `fuzz-tpe-query-multi` | Multi-variable (P+A+R) batch vs Lean |
+| `fuzz-tpe-query-context` | Batch with variable context vs Lean |
+| `fuzz-tpe-query-context-field` | Batch with variable context field vs Lean |
 
 ### Entity Slicing & Schema
 | Make Target | Purpose |
