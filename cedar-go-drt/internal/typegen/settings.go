@@ -12,9 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package typegen provides type-directed test input generation for Cedar DRT.
-// It generates schemas, entities, policies, and requests that are well-typed
-// according to the schema, improving fuzzing effectiveness.
 package typegen
 
 // Settings controls the generation of schemas, entities, policies, and requests.

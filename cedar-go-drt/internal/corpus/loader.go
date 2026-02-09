@@ -12,14 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package corpus provides utilities for loading Cedar integration test data
-// as corpus seeds for differential randomized testing.
-//
-// This package supports loading test data from multiple sources:
-// - Cedar policy sandbox directories (tiny_sandboxes)
-// - Raw .cedar policy files from the cedar repository
-// - Cedar integration test suites
-// - Synthesized test outputs from Rust DRT
 package corpus
 
 import (
