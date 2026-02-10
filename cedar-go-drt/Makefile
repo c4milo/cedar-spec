@@ -54,8 +54,13 @@ endif
 
 # SMT solver paths for SymCC targets
 # The Lean code uses CVC5 if available, falling back to Z3
-CVC5_PATH := $(or $(CVC5),$(shell which cvc5 2>/dev/null),$(wildcard $(HOME)/.local/bin/cvc5),$(wildcard /usr/local/bin/cvc5),$(wildcard /opt/homebrew/bin/cvc5))
+# To force z3 only: make fuzz-symcc-never-errors USE_Z3=1
 Z3_PATH := $(or $(Z3),$(shell which z3 2>/dev/null),$(wildcard /opt/homebrew/bin/z3),$(wildcard /usr/local/bin/z3))
+ifdef USE_Z3
+CVC5_PATH :=
+else
+CVC5_PATH := $(or $(CVC5),$(shell which cvc5 2>/dev/null),$(wildcard $(HOME)/.local/bin/cvc5),$(wildcard /usr/local/bin/cvc5),$(wildcard /opt/homebrew/bin/cvc5))
+endif
 
 # SMT solver environment variables (set both, Lean picks CVC5 first)
 SMT_ENV := $(if $(CVC5_PATH),CVC5="$(CVC5_PATH)") $(if $(Z3_PATH),Z3="$(Z3_PATH)")
@@ -65,6 +70,10 @@ HAS_SMT_SOLVER := $(or $(CVC5_PATH),$(Z3_PATH))
 
 # Fuzz time for SymCC targets (can be overridden: make fuzz-symcc-all SYMCC_FUZZTIME=1m)
 SYMCC_FUZZTIME ?= 2m
+
+# Fuzz parallel workers (reduce for SymCC to avoid "too many open files": make fuzz-symcc-* FUZZ_PARALLEL=1)
+FUZZ_PARALLEL ?=
+FUZZ_PARALLEL_FLAG := $(if $(FUZZ_PARALLEL),-parallel=$(FUZZ_PARALLEL))
 
 .PHONY: all lean proto build test test-fuzz test-symcc lint deadcode fmt fuzz-auth fuzz-val fuzz-val-strict fuzz-eval fuzz-eval-td fuzz-entity-val fuzz-request-val fuzz-level-val fuzz-auth-td fuzz-val-td fuzz-batch fuzz-batch-drt fuzz-roundtrip fuzz-proto-roundtrip fuzz-rbac fuzz-rbac-authorizer fuzz-val-pbt fuzz-val-pbt-td fuzz-wildcard fuzz-partial-eval fuzz-partial-eval-pbt fuzz-policy-cedar-to-json fuzz-policy-json-to-cedar fuzz-tpe-query-principal fuzz-tpe-query-resource fuzz-tpe-query-action fuzz-entity-slicing fuzz-schema-resolution fuzz-input-generation fuzz-parser-crash fuzz-schema-parser fuzz-schema-wf fuzz-schema-wf-td fuzz-forbid-trumps fuzz-default-deny fuzz-order-dup fuzz-tpe-drt fuzz-tpe-soundness fuzz-tpe-reauth fuzz-symcc-never-errors fuzz-symcc-always-matches fuzz-symcc-never-matches fuzz-symcc-always-allows fuzz-symcc-always-denies fuzz-symcc-matches-equiv fuzz-symcc-matches-implies fuzz-symcc-equiv fuzz-symcc-implies fuzz-symcc-all corpus corpus-from-drt corpus-full corpus-expanded corpus-validation corpus-validation-expanded clean help
 
@@ -303,7 +312,7 @@ fuzz-batch: proto
 	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(SMT_ENV) \
-	go test -fuzz=FuzzBatchedEvaluation -fuzztime=5m ./fuzz/
+	go test -fuzz='^FuzzBatchedEvaluation$$' -fuzztime=5m ./fuzz/
 
 ## fuzz-roundtrip: Run roundtrip fuzzing (no Lean FFI calls but needs CGO for build)
 fuzz-roundtrip: proto
@@ -392,7 +401,7 @@ fuzz-partial-eval: proto
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
 	$(SMT_ENV) \
-	go test -fuzz=FuzzPartialEvaluation -fuzztime=5m ./fuzz/
+	go test -fuzz='^FuzzPartialEvaluation$$' -fuzztime=5m ./fuzz/
 
 ## fuzz-partial-eval-pbt: Run partial evaluation property-based testing
 fuzz-partial-eval-pbt: proto
@@ -498,7 +507,7 @@ fuzz-entity-slicing: proto
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
 	$(SMT_ENV) \
-	go test -fuzz=FuzzEntitySlicing -fuzztime=5m ./fuzz/
+	go test -fuzz='^FuzzEntitySlicing$$' -fuzztime=5m ./fuzz/
 
 ## fuzz-schema-resolution: Run schema resolution fuzzing
 fuzz-schema-resolution: proto
@@ -626,7 +635,7 @@ fuzz-symcc-never-errors: proto
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
 	$(SMT_ENV) \
-	go test -fuzz=FuzzSymCCNeverErrors -fuzztime=5m ./fuzz/
+	go test -fuzz='^FuzzSymCCNeverErrors$$' -fuzztime=5m $(FUZZ_PARALLEL_FLAG) ./fuzz/
 
 ## fuzz-symcc-always-matches: Run SymCC alwaysMatches fuzzing (requires cvc5)
 ## Tests that policy conditions always evaluate to true
@@ -637,7 +646,7 @@ fuzz-symcc-always-matches: proto
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
 	$(SMT_ENV) \
-	go test -fuzz=FuzzSymCCAlwaysMatches -fuzztime=5m ./fuzz/
+	go test -fuzz='^FuzzSymCCAlwaysMatches$$' -fuzztime=5m $(FUZZ_PARALLEL_FLAG) ./fuzz/
 
 ## fuzz-symcc-never-matches: Run SymCC neverMatches fuzzing (requires cvc5)
 ## Tests that policy conditions never evaluate to true
@@ -648,7 +657,7 @@ fuzz-symcc-never-matches: proto
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
 	$(SMT_ENV) \
-	go test -fuzz=FuzzSymCCNeverMatches -fuzztime=5m ./fuzz/
+	go test -fuzz='^FuzzSymCCNeverMatches$$' -fuzztime=5m $(FUZZ_PARALLEL_FLAG) ./fuzz/
 
 ## fuzz-symcc-always-allows: Run SymCC alwaysAllows fuzzing (requires cvc5)
 ## Tests that policy sets always allow requests
@@ -659,7 +668,7 @@ fuzz-symcc-always-allows: proto
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
 	$(SMT_ENV) \
-	go test -fuzz=FuzzSymCCAlwaysAllows -fuzztime=5m ./fuzz/
+	go test -fuzz='^FuzzSymCCAlwaysAllows$$' -fuzztime=5m $(FUZZ_PARALLEL_FLAG) ./fuzz/
 
 ## fuzz-symcc-always-denies: Run SymCC alwaysDenies fuzzing (requires cvc5)
 ## Tests that policy sets always deny requests
@@ -670,7 +679,7 @@ fuzz-symcc-always-denies: proto
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
 	$(SMT_ENV) \
-	go test -fuzz=FuzzSymCCAlwaysDenies -fuzztime=5m ./fuzz/
+	go test -fuzz='^FuzzSymCCAlwaysDenies$$' -fuzztime=5m $(FUZZ_PARALLEL_FLAG) ./fuzz/
 
 ## fuzz-symcc-matches-equiv: Run SymCC matchesEquivalent fuzzing (requires cvc5)
 ## Tests that two policies have equivalent conditions
@@ -681,7 +690,7 @@ fuzz-symcc-matches-equiv: proto
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
 	$(SMT_ENV) \
-	go test -fuzz=FuzzSymCCMatchesEquivalent -fuzztime=5m ./fuzz/
+	go test -fuzz='^FuzzSymCCMatchesEquivalent$$' -fuzztime=5m $(FUZZ_PARALLEL_FLAG) ./fuzz/
 
 ## fuzz-symcc-matches-implies: Run SymCC matchesImplies fuzzing (requires cvc5)
 ## Tests that one policy's condition implies another's
@@ -692,7 +701,7 @@ fuzz-symcc-matches-implies: proto
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
 	$(SMT_ENV) \
-	go test -fuzz=FuzzSymCCMatchesImplies -fuzztime=5m ./fuzz/
+	go test -fuzz='^FuzzSymCCMatchesImplies$$' -fuzztime=5m $(FUZZ_PARALLEL_FLAG) ./fuzz/
 
 ## fuzz-symcc-equiv: Run SymCC equivalent fuzzing (requires cvc5)
 ## Tests that two policy sets are equivalent
@@ -703,7 +712,7 @@ fuzz-symcc-equiv: proto
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
 	$(SMT_ENV) \
-	go test -fuzz=FuzzSymCCEquivalent -fuzztime=5m ./fuzz/
+	go test -fuzz='^FuzzSymCCEquivalent$$' -fuzztime=5m $(FUZZ_PARALLEL_FLAG) ./fuzz/
 
 ## fuzz-symcc-implies: Run SymCC implies fuzzing (requires cvc5)
 ## Tests that one policy set implies another
@@ -714,7 +723,7 @@ fuzz-symcc-implies: proto
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
 	$(SMT_ENV) \
-	go test -fuzz=FuzzSymCCImplies -fuzztime=5m ./fuzz/
+	go test -fuzz='^FuzzSymCCImplies$$' -fuzztime=5m $(FUZZ_PARALLEL_FLAG) ./fuzz/
 
 ## fuzz-symcc-all: Run stable SymCC fuzz targets (requires cvc5)
 ## Note: Run 'ulimit -n 10240' first to avoid "too many open files" errors
@@ -732,7 +741,7 @@ fuzz-symcc-all: proto
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
 	$(SMT_ENV) \
-	go test -fuzz=FuzzSymCCNeverErrors -fuzztime=$(SYMCC_FUZZTIME) ./fuzz/
+	go test -fuzz='^FuzzSymCCNeverErrors$$' -fuzztime=$(SYMCC_FUZZTIME) $(FUZZ_PARALLEL_FLAG) ./fuzz/
 	@echo ""
 	@echo "Stable SymCC fuzz target completed!"
 	@echo ""
