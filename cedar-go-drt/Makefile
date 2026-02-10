@@ -75,7 +75,7 @@ SYMCC_FUZZTIME ?= 2m
 FUZZ_PARALLEL ?=
 FUZZ_PARALLEL_FLAG := $(if $(FUZZ_PARALLEL),-parallel=$(FUZZ_PARALLEL))
 
-.PHONY: all lean proto build test test-fuzz test-symcc lint deadcode fmt fuzz-auth fuzz-val fuzz-val-strict fuzz-eval fuzz-eval-td fuzz-entity-val fuzz-request-val fuzz-level-val fuzz-auth-td fuzz-val-td fuzz-batch fuzz-batch-drt fuzz-roundtrip fuzz-proto-roundtrip fuzz-rbac fuzz-rbac-authorizer fuzz-val-pbt fuzz-val-pbt-td fuzz-wildcard fuzz-partial-eval fuzz-partial-eval-pbt fuzz-policy-cedar-to-json fuzz-policy-json-to-cedar fuzz-tpe-query-principal fuzz-tpe-query-resource fuzz-tpe-query-action fuzz-entity-slicing fuzz-schema-resolution fuzz-input-generation fuzz-parser-crash fuzz-schema-parser fuzz-schema-wf fuzz-schema-wf-td fuzz-forbid-trumps fuzz-default-deny fuzz-order-dup fuzz-tpe-drt fuzz-tpe-soundness fuzz-tpe-reauth fuzz-symcc-never-errors fuzz-symcc-always-matches fuzz-symcc-never-matches fuzz-symcc-always-allows fuzz-symcc-always-denies fuzz-symcc-matches-equiv fuzz-symcc-matches-implies fuzz-symcc-matches-disjoint fuzz-symcc-equiv fuzz-symcc-implies fuzz-symcc-disjoint fuzz-symcc-withcex fuzz-symcc-all corpus corpus-from-drt corpus-full corpus-expanded corpus-validation corpus-validation-expanded clean help
+.PHONY: all lean proto build test test-fuzz test-symcc lint deadcode fmt fuzz-auth fuzz-val fuzz-val-strict fuzz-eval fuzz-eval-td fuzz-eval-ext fuzz-eval-ext-td fuzz-entity-val fuzz-request-val fuzz-level-val fuzz-auth-td fuzz-val-td fuzz-batch fuzz-batch-drt fuzz-roundtrip fuzz-proto-roundtrip fuzz-rbac fuzz-rbac-authorizer fuzz-val-pbt fuzz-val-pbt-td fuzz-wildcard fuzz-partial-eval fuzz-partial-eval-pbt fuzz-policy-cedar-to-json fuzz-policy-json-to-cedar fuzz-tpe-query-principal fuzz-tpe-query-resource fuzz-tpe-query-action fuzz-entity-slicing fuzz-schema-resolution fuzz-input-generation fuzz-parser-crash fuzz-schema-parser fuzz-schema-wf fuzz-schema-wf-td fuzz-forbid-trumps fuzz-default-deny fuzz-order-dup fuzz-tpe-drt fuzz-tpe-soundness fuzz-tpe-reauth fuzz-symcc-never-errors fuzz-symcc-always-matches fuzz-symcc-never-matches fuzz-symcc-always-allows fuzz-symcc-always-denies fuzz-symcc-matches-equiv fuzz-symcc-matches-implies fuzz-symcc-matches-disjoint fuzz-symcc-equiv fuzz-symcc-implies fuzz-symcc-disjoint fuzz-symcc-withcex fuzz-symcc-all corpus corpus-from-drt corpus-full corpus-expanded corpus-validation corpus-validation-expanded clean help
 
 all: proto build
 
@@ -260,6 +260,25 @@ fuzz-eval-td: proto
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
 	$(SMT_ENV) \
 	go test -fuzz=FuzzEvaluationTypeDirected -fuzztime=5m ./fuzz/
+
+## fuzz-eval-ext: Run extension function evaluation DRT (decimal, IP, datetime, duration)
+## Tests Cedar extension functions against Lean Ext/Decimal.lean, Ext/IPAddr.lean, Ext/Datetime.lean
+fuzz-eval-ext: proto
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
+	go test -fuzz='^FuzzEvaluationExtensions$$' -fuzztime=5m ./fuzz/
+
+## fuzz-eval-ext-td: Run type-directed extension function evaluation DRT
+fuzz-eval-ext-td: proto
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
+	go test -fuzz=FuzzEvaluationExtensionsTypeDirected -fuzztime=5m ./fuzz/
 
 ## fuzz-entity-val: Run entity validation fuzzing
 fuzz-entity-val: proto
