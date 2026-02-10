@@ -75,7 +75,7 @@ SYMCC_FUZZTIME ?= 2m
 FUZZ_PARALLEL ?=
 FUZZ_PARALLEL_FLAG := $(if $(FUZZ_PARALLEL),-parallel=$(FUZZ_PARALLEL))
 
-.PHONY: all lean proto build test test-fuzz test-symcc lint deadcode fmt fuzz-auth fuzz-val fuzz-val-strict fuzz-eval fuzz-eval-td fuzz-eval-ext fuzz-eval-ext-td fuzz-entity-val fuzz-request-val fuzz-level-val fuzz-auth-td fuzz-val-td fuzz-batch fuzz-batch-drt fuzz-roundtrip fuzz-proto-roundtrip fuzz-rbac fuzz-rbac-authorizer fuzz-val-pbt fuzz-val-pbt-td fuzz-wildcard fuzz-partial-eval fuzz-partial-eval-pbt fuzz-policy-cedar-to-json fuzz-policy-json-to-cedar fuzz-tpe-query-principal fuzz-tpe-query-resource fuzz-tpe-query-action fuzz-entity-slicing fuzz-schema-resolution fuzz-input-generation fuzz-parser-crash fuzz-schema-parser fuzz-schema-wf fuzz-schema-wf-td fuzz-forbid-trumps fuzz-default-deny fuzz-order-dup fuzz-tpe-drt fuzz-tpe-soundness fuzz-tpe-reauth fuzz-symcc-never-errors fuzz-symcc-always-matches fuzz-symcc-never-matches fuzz-symcc-always-allows fuzz-symcc-always-denies fuzz-symcc-matches-equiv fuzz-symcc-matches-implies fuzz-symcc-matches-disjoint fuzz-symcc-equiv fuzz-symcc-implies fuzz-symcc-disjoint fuzz-symcc-withcex fuzz-symcc-all corpus corpus-from-drt corpus-full corpus-expanded corpus-validation corpus-validation-expanded clean help
+.PHONY: all lean proto build test test-fuzz test-symcc lint deadcode fmt fuzz-auth fuzz-val fuzz-val-strict fuzz-eval fuzz-eval-td fuzz-eval-ext fuzz-eval-ext-td fuzz-entity-val fuzz-request-val fuzz-level-val fuzz-auth-td fuzz-val-td fuzz-batch fuzz-batch-drt fuzz-roundtrip fuzz-proto-roundtrip fuzz-rbac fuzz-rbac-authorizer fuzz-val-pbt fuzz-val-pbt-td fuzz-wildcard fuzz-partial-eval fuzz-partial-eval-pbt fuzz-policy-cedar-to-json fuzz-policy-json-to-cedar fuzz-tpe-query-principal fuzz-tpe-query-resource fuzz-tpe-query-action fuzz-entity-slicing fuzz-schema-resolution fuzz-input-generation fuzz-parser-crash fuzz-schema-parser fuzz-schema-wf fuzz-schema-wf-td fuzz-forbid-trumps fuzz-default-deny fuzz-order-dup fuzz-denied-iff fuzz-add-permit fuzz-add-forbid fuzz-det-err-disjoint fuzz-unchanged-det fuzz-unchanged-err fuzz-tpe-drt fuzz-tpe-soundness fuzz-tpe-reauth fuzz-symcc-never-errors fuzz-symcc-always-matches fuzz-symcc-never-matches fuzz-symcc-always-allows fuzz-symcc-always-denies fuzz-symcc-matches-equiv fuzz-symcc-matches-implies fuzz-symcc-matches-disjoint fuzz-symcc-equiv fuzz-symcc-implies fuzz-symcc-disjoint fuzz-symcc-withcex fuzz-symcc-all corpus corpus-from-drt corpus-full corpus-expanded corpus-validation corpus-validation-expanded clean help
 
 all: proto build
 
@@ -618,6 +618,60 @@ fuzz-order-dup: proto
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(SMT_ENV) \
 	go test -fuzz=FuzzOrderAndDupIndependent -fuzztime=2m ./fuzz/
+
+## fuzz-denied-iff: Run denied_iff_explicitly_denied_or_not_permitted theorem fuzzing
+## Tests that deny ↔ (explicitly forbidden ∨ ¬explicitly permitted)
+fuzz-denied-iff: proto
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(SMT_ENV) \
+	go test -fuzz=FuzzDeniedIffExplicitlyDeniedOrNotPermitted -fuzztime=2m ./fuzz/
+
+## fuzz-add-permit: Run unchanged_allow_when_add_permit theorem fuzzing
+## Tests that adding a permit policy won't change an Allow decision
+fuzz-add-permit: proto
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(SMT_ENV) \
+	go test -fuzz=FuzzUnchangedAllowWhenAddPermit -fuzztime=2m ./fuzz/
+
+## fuzz-add-forbid: Run unchanged_deny_when_add_forbid theorem fuzzing
+## Tests that adding a forbid policy won't change a Deny decision
+fuzz-add-forbid: proto
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(SMT_ENV) \
+	go test -fuzz=FuzzUnchangedDenyWhenAddForbid -fuzztime=2m ./fuzz/
+
+## fuzz-det-err-disjoint: Run determining_erroring_disjoint theorem fuzzing
+## Tests that determining and erroring policy sets are always disjoint
+fuzz-det-err-disjoint: proto
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(SMT_ENV) \
+	go test -fuzz=FuzzDeterminingErroringDisjoint -fuzztime=2m ./fuzz/
+
+## fuzz-unchanged-det: Run unchanged_determining theorem fuzzing
+## Tests that determining policies are preserved when adding a policy that doesn't change the decision
+fuzz-unchanged-det: proto
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(SMT_ENV) \
+	go test -fuzz=FuzzUnchangedDeterminingWhenDecisionUnchanged -fuzztime=2m ./fuzz/
+
+## fuzz-unchanged-err: Run unchanged_erroring theorem fuzzing
+## Tests that erroring policies are preserved when adding any policy
+fuzz-unchanged-err: proto
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(SMT_ENV) \
+	go test -fuzz=FuzzUnchangedErroringWhenAddPolicy -fuzztime=2m ./fuzz/
 
 ## fuzz-tpe-drt: Run TPE DRT (compares cedar-go batch evaluation against Lean TPE)
 fuzz-tpe-drt: proto

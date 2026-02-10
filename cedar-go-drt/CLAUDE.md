@@ -110,7 +110,7 @@ Compares cedar-go vs Lean results:
 - `CompareValidation()` - Valid/invalid with error messages
 - `CheckTypeSoundness()` - If cedar-go accepts, Lean must too
 
-## Fuzz Targets (69 total)
+## Fuzz Targets (75 total)
 
 ### Authorization Theorems (No Lean Required) ⚡
 Property-based tests verifying Lean authorization theorems:
@@ -119,6 +119,12 @@ Property-based tests verifying Lean authorization theorems:
 | `fuzz-forbid-trumps` | `forbid_trumps_permit` - forbid always overrides permit |
 | `fuzz-default-deny` | `default_deny` - deny if no permit satisfied |
 | `fuzz-order-dup` | `order_and_dup_independent` - order/duplicates don't affect result |
+| `fuzz-denied-iff` | `denied_iff_explicitly_denied_or_not_permitted` - deny iff forbidden or not permitted |
+| `fuzz-add-permit` | `unchanged_allow_when_add_permit` - adding permit won't flip Allow |
+| `fuzz-add-forbid` | `unchanged_deny_when_add_forbid` - adding forbid won't flip Deny |
+| `fuzz-det-err-disjoint` | `determining_erroring_disjoint_when_unique_ids` - determining/erroring are disjoint |
+| `fuzz-unchanged-det` | `unchanged_determining_when_add_policy` - determining preserved if decision unchanged |
+| `fuzz-unchanged-err` | `unchanged_erroring_when_add_policy` - erroring preserved when adding any policy |
 
 ### Authorization (Lean Required)
 | Make Target | Purpose |
@@ -285,6 +291,12 @@ The **strict validation mode** (`fuzz-val-strict`) catches:
 1. **forbid_trumps_permit**: If a forbid policy is satisfied, decision = deny
 2. **default_deny**: If no permit policy is satisfied, decision = deny
 3. **order_and_dup_independent**: Authorization is independent of policy order/duplicates
+4. **denied_iff_explicitly_denied_or_not_permitted**: Deny iff explicitly forbidden or not permitted
+5. **unchanged_allow_when_add_permit**: Adding a permit won't flip Allow to Deny
+6. **unchanged_deny_when_add_forbid**: Adding a forbid won't flip Deny to Allow
+7. **determining_erroring_disjoint_when_unique_ids**: Determining and erroring policies are disjoint
+8. **unchanged_determining_when_add_policy**: Determining policies preserved when decision unchanged
+9. **unchanged_erroring_when_add_policy**: Erroring policies preserved when adding any policy
 
 ### DRT Properties
 4. **Soundness**: Partial evaluation preserves authorization decisions

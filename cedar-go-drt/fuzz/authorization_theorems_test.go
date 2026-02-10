@@ -15,6 +15,7 @@
 package fuzz
 
 import (
+	"fmt"
 	"math/rand/v2"
 	"testing"
 
@@ -30,6 +31,12 @@ import (
 // - forbid_trumps_permit: If a forbid policy is satisfied, decision = deny
 // - default_deny: If no permit policy is satisfied, decision = deny
 // - order_and_dup_independent: Authorization is independent of policy order/duplicates
+// - denied_iff_explicitly_denied_or_not_permitted: Deny ↔ explicitly forbidden or not explicitly permitted
+// - unchanged_allow_when_add_permit: Adding a permit won't flip Allow to Deny
+// - unchanged_deny_when_add_forbid: Adding a forbid won't flip Deny to Allow
+// - determining_erroring_disjoint_when_unique_ids: Determining and erroring policies are disjoint
+// - unchanged_determining_when_add_policy_and_decision_unchanged: Determining policies preserved when decision unchanged
+// - unchanged_erroring_when_add_policy: Erroring policies preserved when adding any policy
 
 // FuzzForbidTrumpsPermit verifies the forbid_trumps_permit theorem:
 // If there is a satisfied forbid policy, the decision must be deny,
@@ -483,5 +490,626 @@ func TestOrderIndependenceBasic(t *testing.T) {
 	if decision1 != decision2 {
 		t.Errorf("Order independence violated: got %v and %v for different orderings",
 			decision1, decision2)
+	}
+}
+
+// ---------- New theorems from Cedar additional properties (#203) ----------
+
+// FuzzDeniedIffExplicitlyDeniedOrNotPermitted verifies:
+// A request is denied iff it is explicitly forbidden or not explicitly permitted.
+// This is the converse characterization of the deny decision.
+func FuzzDeniedIffExplicitlyDeniedOrNotPermitted(f *testing.F) {
+	f.Add([]byte("denied-iff-seed-1"))
+	f.Add([]byte("denied-iff-seed-2"))
+	f.Add(make([]byte, 64))
+
+	inputGen := typegen.TypeDirectedInputGenerator()
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		if len(data) < 16 {
+			return
+		}
+
+		input, err := inputGen.Generate(data)
+		if err != nil {
+			return
+		}
+
+		request := buildRequest(input)
+		decision, diag := cedar.Authorize(input.Policies, input.Entities.Entities, request)
+
+		// Check if explicitly forbidden (any satisfied forbid policy in Reasons)
+		explicitlyForbidden := false
+		for _, reason := range diag.Reasons {
+			p := input.Policies.Get(reason.PolicyID)
+			if p != nil && p.Effect() == cedar.Forbid {
+				explicitlyForbidden = true
+				break
+			}
+		}
+
+		// Check if explicitly permitted (any satisfied permit policy)
+		// A permit is satisfied if it appears in Reasons when the decision would be Allow
+		// without any forbid. We can check by looking at permit policies in Reasons.
+		explicitlyPermitted := false
+		for _, reason := range diag.Reasons {
+			p := input.Policies.Get(reason.PolicyID)
+			if p != nil && p.Effect() == cedar.Permit {
+				explicitlyPermitted = true
+				break
+			}
+		}
+
+		// Theorem: denied_iff_explicitly_denied_or_not_permitted
+		// deny ↔ (explicitly forbidden ∨ ¬explicitly permitted)
+		isDeny := decision == cedar.Deny
+		shouldBeDeny := explicitlyForbidden || !explicitlyPermitted
+
+		if isDeny != shouldBeDeny {
+			t.Errorf("denied_iff_explicitly_denied_or_not_permitted violated:\n"+
+				"decision=%v, explicitlyForbidden=%v, explicitlyPermitted=%v\n"+
+				"expected deny=%v, got deny=%v\nRequest: %+v\nDiagnostic: %+v",
+				decision, explicitlyForbidden, explicitlyPermitted,
+				shouldBeDeny, isDeny, request, diag)
+		}
+	})
+}
+
+// FuzzUnchangedAllowWhenAddPermit verifies:
+// Adding a permit policy to a policy set that already allows a request
+// won't change the Allow decision.
+func FuzzUnchangedAllowWhenAddPermit(f *testing.F) {
+	f.Add([]byte("add-permit-seed-1"))
+	f.Add([]byte("add-permit-seed-2"))
+	f.Add(make([]byte, 64))
+
+	inputGen := typegen.TypeDirectedInputGenerator()
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		if len(data) < 16 {
+			return
+		}
+
+		input, err := inputGen.Generate(data)
+		if err != nil {
+			return
+		}
+
+		request := buildRequest(input)
+		decision, _ := cedar.Authorize(input.Policies, input.Entities.Entities, request)
+
+		if decision != cedar.Allow {
+			return // Theorem only applies when original decision is Allow
+		}
+
+		// Generate a few different permit policies and add each one
+		permitStrs := []string{
+			`permit(principal, action, resource);`,
+			`permit(principal, action, resource) when { true };`,
+			fmt.Sprintf(`permit(principal == %s, action, resource);`, request.Principal),
+		}
+
+		for i, pStr := range permitStrs {
+			newPolicies := cedar.NewPolicySet()
+			// Copy existing policies
+			for id, p := range input.Policies.All() {
+				newPolicies.Add(id, p)
+			}
+			// Add new permit policy
+			var newPermit cedar.Policy
+			if err := newPermit.UnmarshalCedar([]byte(pStr)); err != nil {
+				continue
+			}
+			newPolicies.Add(cedar.PolicyID(fmt.Sprintf("added-permit-%d", i)), &newPermit)
+
+			newDecision, _ := cedar.Authorize(newPolicies, input.Entities.Entities, request)
+
+			if newDecision != cedar.Allow {
+				t.Errorf("unchanged_allow_when_add_permit violated:\n"+
+					"Original decision=Allow, after adding permit policy %q got %v\n"+
+					"Request: %+v", pStr, newDecision, request)
+			}
+		}
+	})
+}
+
+// FuzzUnchangedDenyWhenAddForbid verifies:
+// Adding a forbid policy to a policy set that already denies a request
+// won't change the Deny decision.
+func FuzzUnchangedDenyWhenAddForbid(f *testing.F) {
+	f.Add([]byte("add-forbid-seed-1"))
+	f.Add([]byte("add-forbid-seed-2"))
+	f.Add(make([]byte, 64))
+
+	inputGen := typegen.TypeDirectedInputGenerator()
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		if len(data) < 16 {
+			return
+		}
+
+		input, err := inputGen.Generate(data)
+		if err != nil {
+			return
+		}
+
+		request := buildRequest(input)
+		decision, _ := cedar.Authorize(input.Policies, input.Entities.Entities, request)
+
+		if decision != cedar.Deny {
+			return // Theorem only applies when original decision is Deny
+		}
+
+		// Generate a few different forbid policies and add each one
+		forbidStrs := []string{
+			`forbid(principal, action, resource);`,
+			`forbid(principal, action, resource) when { true };`,
+			fmt.Sprintf(`forbid(principal == %s, action, resource);`, request.Principal),
+		}
+
+		for i, fStr := range forbidStrs {
+			newPolicies := cedar.NewPolicySet()
+			for id, p := range input.Policies.All() {
+				newPolicies.Add(id, p)
+			}
+			var newForbid cedar.Policy
+			if err := newForbid.UnmarshalCedar([]byte(fStr)); err != nil {
+				continue
+			}
+			newPolicies.Add(cedar.PolicyID(fmt.Sprintf("added-forbid-%d", i)), &newForbid)
+
+			newDecision, _ := cedar.Authorize(newPolicies, input.Entities.Entities, request)
+
+			if newDecision != cedar.Deny {
+				t.Errorf("unchanged_deny_when_add_forbid violated:\n"+
+					"Original decision=Deny, after adding forbid policy %q got %v\n"+
+					"Request: %+v", fStr, newDecision, request)
+			}
+		}
+	})
+}
+
+// FuzzDeterminingErroringDisjoint verifies:
+// The determining policies and erroring policies of an authorization response
+// are always disjoint (when policy IDs are unique, which PolicySet enforces).
+func FuzzDeterminingErroringDisjoint(f *testing.F) {
+	f.Add([]byte("det-err-disjoint-seed-1"))
+	f.Add([]byte("det-err-disjoint-seed-2"))
+	f.Add(make([]byte, 64))
+
+	inputGen := typegen.TypeDirectedInputGenerator()
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		if len(data) < 16 {
+			return
+		}
+
+		input, err := inputGen.Generate(data)
+		if err != nil {
+			return
+		}
+
+		request := buildRequest(input)
+		_, diag := cedar.Authorize(input.Policies, input.Entities.Entities, request)
+
+		// Build set of determining policy IDs
+		determining := make(map[types.PolicyID]bool)
+		for _, reason := range diag.Reasons {
+			determining[reason.PolicyID] = true
+		}
+
+		// Check no erroring policy is also a determining policy
+		for _, diagErr := range diag.Errors {
+			if determining[diagErr.PolicyID] {
+				t.Errorf("determining_erroring_disjoint_when_unique_ids violated:\n"+
+					"Policy %q is both determining and erroring\n"+
+					"Reasons: %+v\nErrors: %+v\nRequest: %+v",
+					diagErr.PolicyID, diag.Reasons, diag.Errors, request)
+			}
+		}
+	})
+}
+
+// FuzzUnchangedDeterminingWhenDecisionUnchanged verifies:
+// If adding a policy doesn't change the authorization decision,
+// then all original determining policies remain determining.
+func FuzzUnchangedDeterminingWhenDecisionUnchanged(f *testing.F) {
+	f.Add([]byte("unchanged-det-seed-1"))
+	f.Add([]byte("unchanged-det-seed-2"))
+	f.Add(make([]byte, 64))
+
+	inputGen := typegen.TypeDirectedInputGenerator()
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		if len(data) < 16 {
+			return
+		}
+
+		input, err := inputGen.Generate(data)
+		if err != nil {
+			return
+		}
+
+		request := buildRequest(input)
+		origDecision, origDiag := cedar.Authorize(input.Policies, input.Entities.Entities, request)
+
+		// Add a new policy (try both permit and forbid)
+		extraPolicies := []string{
+			`permit(principal == AddedType::"added-entity", action, resource);`,
+			`forbid(principal == AddedType::"added-entity", action, resource);`,
+			`permit(principal, action, resource) when { false };`,
+			`forbid(principal, action, resource) when { false };`,
+		}
+
+		for i, pStr := range extraPolicies {
+			newPolicies := cedar.NewPolicySet()
+			for id, p := range input.Policies.All() {
+				newPolicies.Add(id, p)
+			}
+			var newPolicy cedar.Policy
+			if err := newPolicy.UnmarshalCedar([]byte(pStr)); err != nil {
+				continue
+			}
+			addedID := cedar.PolicyID(fmt.Sprintf("added-policy-%d", i))
+			newPolicies.Add(addedID, &newPolicy)
+
+			newDecision, newDiag := cedar.Authorize(newPolicies, input.Entities.Entities, request)
+
+			if origDecision != newDecision {
+				continue // Decision changed, theorem doesn't apply
+			}
+
+			// Theorem: all original determining policies must still be determining
+			newDetermining := make(map[types.PolicyID]bool)
+			for _, reason := range newDiag.Reasons {
+				newDetermining[reason.PolicyID] = true
+			}
+
+			for _, origReason := range origDiag.Reasons {
+				if !newDetermining[origReason.PolicyID] {
+					t.Errorf("unchanged_determining_when_add_policy violated:\n"+
+						"Decision unchanged (%v), but determining policy %q was lost\n"+
+						"Added policy: %q\nOriginal reasons: %+v\nNew reasons: %+v\nRequest: %+v",
+						origDecision, origReason.PolicyID, pStr,
+						origDiag.Reasons, newDiag.Reasons, request)
+				}
+			}
+		}
+	})
+}
+
+// FuzzUnchangedErroringWhenAddPolicy verifies:
+// Adding any policy preserves the set of erroring policies from the original
+// evaluation, regardless of whether the decision changes.
+func FuzzUnchangedErroringWhenAddPolicy(f *testing.F) {
+	f.Add([]byte("unchanged-err-seed-1"))
+	f.Add([]byte("unchanged-err-seed-2"))
+	f.Add(make([]byte, 64))
+
+	inputGen := typegen.TypeDirectedInputGenerator()
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		if len(data) < 16 {
+			return
+		}
+
+		input, err := inputGen.Generate(data)
+		if err != nil {
+			return
+		}
+
+		request := buildRequest(input)
+		_, origDiag := cedar.Authorize(input.Policies, input.Entities.Entities, request)
+
+		// Add various policies
+		extraPolicies := []string{
+			`permit(principal, action, resource);`,
+			`forbid(principal, action, resource);`,
+			`permit(principal, action, resource) when { context.nonexistent };`,
+		}
+
+		for i, pStr := range extraPolicies {
+			newPolicies := cedar.NewPolicySet()
+			for id, p := range input.Policies.All() {
+				newPolicies.Add(id, p)
+			}
+			var newPolicy cedar.Policy
+			if err := newPolicy.UnmarshalCedar([]byte(pStr)); err != nil {
+				continue
+			}
+			newPolicies.Add(cedar.PolicyID(fmt.Sprintf("added-policy-%d", i)), &newPolicy)
+
+			_, newDiag := cedar.Authorize(newPolicies, input.Entities.Entities, request)
+
+			// Theorem: all original erroring policies must still be erroring
+			newErroring := make(map[types.PolicyID]bool)
+			for _, diagErr := range newDiag.Errors {
+				newErroring[diagErr.PolicyID] = true
+			}
+
+			for _, origErr := range origDiag.Errors {
+				if !newErroring[origErr.PolicyID] {
+					t.Errorf("unchanged_erroring_when_add_policy violated:\n"+
+						"Erroring policy %q was lost after adding policy %q\n"+
+						"Original errors: %+v\nNew errors: %+v\nRequest: %+v",
+						origErr.PolicyID, pStr,
+						origDiag.Errors, newDiag.Errors, request)
+				}
+			}
+		}
+	})
+}
+
+// ---------- Unit tests for new theorems ----------
+
+// TestDeniedIffExplicitlyDeniedOrNotPermitted tests the biconditional:
+// deny ↔ (explicitly forbidden ∨ ¬explicitly permitted)
+func TestDeniedIffExplicitlyDeniedOrNotPermitted(t *testing.T) {
+	request := cedar.Request{
+		Principal: types.NewEntityUID("User", "alice"),
+		Action:    types.NewEntityUID("Action", "view"),
+		Resource:  types.NewEntityUID("Doc", "doc1"),
+		Context:   types.NewRecord(types.RecordMap{}),
+	}
+
+	tests := []struct {
+		name                string
+		policies            []string
+		expectedDeny        bool
+		explicitlyForbidden bool
+		explicitlyPermitted bool
+	}{
+		{
+			name:                "no policies → deny (not permitted)",
+			policies:            []string{},
+			expectedDeny:        true,
+			explicitlyForbidden: false,
+			explicitlyPermitted: false,
+		},
+		{
+			name:                "only permit → allow",
+			policies:            []string{`permit(principal, action, resource);`},
+			expectedDeny:        false,
+			explicitlyForbidden: false,
+			explicitlyPermitted: true,
+		},
+		{
+			name: "permit + forbid → deny (explicitly forbidden)",
+			policies: []string{
+				`permit(principal, action, resource);`,
+				`forbid(principal, action, resource);`,
+			},
+			expectedDeny:        true,
+			explicitlyForbidden: true,
+			explicitlyPermitted: true,
+		},
+		{
+			name:                "unsatisfied permit → deny (not permitted)",
+			policies:            []string{`permit(principal == User::"bob", action, resource);`},
+			expectedDeny:        true,
+			explicitlyForbidden: false,
+			explicitlyPermitted: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ps := cedar.NewPolicySet()
+			for i, pStr := range tc.policies {
+				var p cedar.Policy
+				if err := p.UnmarshalCedar([]byte(pStr)); err != nil {
+					t.Fatalf("Failed to parse policy %d: %v", i, err)
+				}
+				ps.Add(cedar.PolicyID(fmt.Sprintf("p%d", i)), &p)
+			}
+
+			decision, _ := cedar.Authorize(ps, types.EntityMap{}, request)
+			isDeny := decision == cedar.Deny
+
+			if isDeny != tc.expectedDeny {
+				t.Errorf("expected deny=%v, got deny=%v", tc.expectedDeny, isDeny)
+			}
+		})
+	}
+}
+
+// TestUnchangedAllowWhenAddPermit tests that adding a permit can't flip Allow to Deny.
+func TestUnchangedAllowWhenAddPermit(t *testing.T) {
+	request := cedar.Request{
+		Principal: types.NewEntityUID("User", "alice"),
+		Action:    types.NewEntityUID("Action", "view"),
+		Resource:  types.NewEntityUID("Doc", "doc1"),
+		Context:   types.NewRecord(types.RecordMap{}),
+	}
+
+	// Start with a policy set that allows
+	ps := cedar.NewPolicySet()
+	var permit cedar.Policy
+	if err := permit.UnmarshalCedar([]byte(`permit(principal, action, resource);`)); err != nil {
+		t.Fatal(err)
+	}
+	ps.Add("permit-all", &permit)
+
+	decision, _ := cedar.Authorize(ps, types.EntityMap{}, request)
+	if decision != cedar.Allow {
+		t.Fatal("precondition: expected Allow")
+	}
+
+	// Add additional permit policies
+	additions := []string{
+		`permit(principal == User::"bob", action, resource);`,
+		`permit(principal, action, resource) when { true };`,
+		`permit(principal, action, resource) when { false };`,
+	}
+
+	for i, pStr := range additions {
+		var p cedar.Policy
+		if err := p.UnmarshalCedar([]byte(pStr)); err != nil {
+			t.Fatalf("Failed to parse policy %d: %v", i, err)
+		}
+		ps.Add(cedar.PolicyID(fmt.Sprintf("extra-permit-%d", i)), &p)
+
+		newDecision, _ := cedar.Authorize(ps, types.EntityMap{}, request)
+		if newDecision != cedar.Allow {
+			t.Errorf("unchanged_allow_when_add_permit violated after adding %q: got %v", pStr, newDecision)
+		}
+	}
+}
+
+// TestUnchangedDenyWhenAddForbid tests that adding a forbid can't flip Deny to Allow.
+func TestUnchangedDenyWhenAddForbid(t *testing.T) {
+	request := cedar.Request{
+		Principal: types.NewEntityUID("User", "alice"),
+		Action:    types.NewEntityUID("Action", "view"),
+		Resource:  types.NewEntityUID("Doc", "doc1"),
+		Context:   types.NewRecord(types.RecordMap{}),
+	}
+
+	// Start with empty policy set (default deny)
+	ps := cedar.NewPolicySet()
+	decision, _ := cedar.Authorize(ps, types.EntityMap{}, request)
+	if decision != cedar.Deny {
+		t.Fatal("precondition: expected Deny")
+	}
+
+	// Add forbid policies
+	additions := []string{
+		`forbid(principal, action, resource);`,
+		`forbid(principal == User::"bob", action, resource);`,
+		`forbid(principal, action, resource) when { true };`,
+	}
+
+	for i, fStr := range additions {
+		var p cedar.Policy
+		if err := p.UnmarshalCedar([]byte(fStr)); err != nil {
+			t.Fatalf("Failed to parse policy %d: %v", i, err)
+		}
+		ps.Add(cedar.PolicyID(fmt.Sprintf("extra-forbid-%d", i)), &p)
+
+		newDecision, _ := cedar.Authorize(ps, types.EntityMap{}, request)
+		if newDecision != cedar.Deny {
+			t.Errorf("unchanged_deny_when_add_forbid violated after adding %q: got %v", fStr, newDecision)
+		}
+	}
+}
+
+// TestDeterminingErroringDisjoint tests that determining and erroring policies never overlap.
+func TestDeterminingErroringDisjoint(t *testing.T) {
+	request := cedar.Request{
+		Principal: types.NewEntityUID("User", "alice"),
+		Action:    types.NewEntityUID("Action", "view"),
+		Resource:  types.NewEntityUID("Doc", "doc1"),
+		Context:   types.NewRecord(types.RecordMap{}),
+	}
+
+	tests := []struct {
+		name     string
+		policies map[string]string
+	}{
+		{
+			name: "permit with error",
+			policies: map[string]string{
+				"good-permit": `permit(principal, action, resource);`,
+				"bad-permit":  `permit(principal, action, resource) when { context.nonexistent > 0 };`,
+			},
+		},
+		{
+			name: "forbid with error",
+			policies: map[string]string{
+				"good-forbid": `forbid(principal, action, resource);`,
+				"bad-forbid":  `forbid(principal, action, resource) when { context.nonexistent > 0 };`,
+			},
+		},
+		{
+			name: "mixed with errors",
+			policies: map[string]string{
+				"permit-ok":    `permit(principal, action, resource);`,
+				"forbid-ok":    `forbid(principal, action, resource);`,
+				"permit-error": `permit(principal, action, resource) when { context.missing };`,
+				"forbid-error": `forbid(principal, action, resource) when { context.missing };`,
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ps := cedar.NewPolicySet()
+			for id, pStr := range tc.policies {
+				var p cedar.Policy
+				if err := p.UnmarshalCedar([]byte(pStr)); err != nil {
+					t.Fatalf("Failed to parse policy %q: %v", id, err)
+				}
+				ps.Add(cedar.PolicyID(id), &p)
+			}
+
+			_, diag := cedar.Authorize(ps, types.EntityMap{}, request)
+
+			determining := make(map[types.PolicyID]bool)
+			for _, reason := range diag.Reasons {
+				determining[reason.PolicyID] = true
+			}
+
+			for _, diagErr := range diag.Errors {
+				if determining[diagErr.PolicyID] {
+					t.Errorf("Policy %q is both determining and erroring", diagErr.PolicyID)
+				}
+			}
+		})
+	}
+}
+
+// TestUnchangedErroringWhenAddPolicy tests that adding a policy preserves erroring policies.
+func TestUnchangedErroringWhenAddPolicy(t *testing.T) {
+	request := cedar.Request{
+		Principal: types.NewEntityUID("User", "alice"),
+		Action:    types.NewEntityUID("Action", "view"),
+		Resource:  types.NewEntityUID("Doc", "doc1"),
+		Context:   types.NewRecord(types.RecordMap{}),
+	}
+
+	// Create a policy set with an erroring policy
+	ps := cedar.NewPolicySet()
+	var errorPolicy cedar.Policy
+	if err := errorPolicy.UnmarshalCedar([]byte(
+		`permit(principal, action, resource) when { context.nonexistent > 0 };`,
+	)); err != nil {
+		t.Fatal(err)
+	}
+	ps.Add("error-policy", &errorPolicy)
+
+	_, origDiag := cedar.Authorize(ps, types.EntityMap{}, request)
+
+	if len(origDiag.Errors) == 0 {
+		t.Fatal("precondition: expected at least one erroring policy")
+	}
+
+	// Add various policies
+	additions := map[string]string{
+		"new-permit": `permit(principal, action, resource);`,
+		"new-forbid": `forbid(principal, action, resource);`,
+	}
+
+	for id, pStr := range additions {
+		newPS := cedar.NewPolicySet()
+		newPS.Add("error-policy", &errorPolicy)
+
+		var p cedar.Policy
+		if err := p.UnmarshalCedar([]byte(pStr)); err != nil {
+			t.Fatalf("Failed to parse policy %q: %v", id, err)
+		}
+		newPS.Add(cedar.PolicyID(id), &p)
+
+		_, newDiag := cedar.Authorize(newPS, types.EntityMap{}, request)
+
+		newErroring := make(map[types.PolicyID]bool)
+		for _, diagErr := range newDiag.Errors {
+			newErroring[diagErr.PolicyID] = true
+		}
+
+		for _, origErr := range origDiag.Errors {
+			if !newErroring[origErr.PolicyID] {
+				t.Errorf("After adding %q: erroring policy %q was lost", id, origErr.PolicyID)
+			}
+		}
 	}
 }
