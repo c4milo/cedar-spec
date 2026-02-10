@@ -75,7 +75,7 @@ SYMCC_FUZZTIME ?= 2m
 FUZZ_PARALLEL ?=
 FUZZ_PARALLEL_FLAG := $(if $(FUZZ_PARALLEL),-parallel=$(FUZZ_PARALLEL))
 
-.PHONY: all lean proto build test test-fuzz test-symcc lint deadcode fmt fuzz-auth fuzz-val fuzz-val-strict fuzz-eval fuzz-eval-td fuzz-entity-val fuzz-request-val fuzz-level-val fuzz-auth-td fuzz-val-td fuzz-batch fuzz-batch-drt fuzz-roundtrip fuzz-proto-roundtrip fuzz-rbac fuzz-rbac-authorizer fuzz-val-pbt fuzz-val-pbt-td fuzz-wildcard fuzz-partial-eval fuzz-partial-eval-pbt fuzz-policy-cedar-to-json fuzz-policy-json-to-cedar fuzz-tpe-query-principal fuzz-tpe-query-resource fuzz-tpe-query-action fuzz-entity-slicing fuzz-schema-resolution fuzz-input-generation fuzz-parser-crash fuzz-schema-parser fuzz-schema-wf fuzz-schema-wf-td fuzz-forbid-trumps fuzz-default-deny fuzz-order-dup fuzz-tpe-drt fuzz-tpe-soundness fuzz-tpe-reauth fuzz-symcc-never-errors fuzz-symcc-always-matches fuzz-symcc-never-matches fuzz-symcc-always-allows fuzz-symcc-always-denies fuzz-symcc-matches-equiv fuzz-symcc-matches-implies fuzz-symcc-equiv fuzz-symcc-implies fuzz-symcc-all corpus corpus-from-drt corpus-full corpus-expanded corpus-validation corpus-validation-expanded clean help
+.PHONY: all lean proto build test test-fuzz test-symcc lint deadcode fmt fuzz-auth fuzz-val fuzz-val-strict fuzz-eval fuzz-eval-td fuzz-entity-val fuzz-request-val fuzz-level-val fuzz-auth-td fuzz-val-td fuzz-batch fuzz-batch-drt fuzz-roundtrip fuzz-proto-roundtrip fuzz-rbac fuzz-rbac-authorizer fuzz-val-pbt fuzz-val-pbt-td fuzz-wildcard fuzz-partial-eval fuzz-partial-eval-pbt fuzz-policy-cedar-to-json fuzz-policy-json-to-cedar fuzz-tpe-query-principal fuzz-tpe-query-resource fuzz-tpe-query-action fuzz-entity-slicing fuzz-schema-resolution fuzz-input-generation fuzz-parser-crash fuzz-schema-parser fuzz-schema-wf fuzz-schema-wf-td fuzz-forbid-trumps fuzz-default-deny fuzz-order-dup fuzz-tpe-drt fuzz-tpe-soundness fuzz-tpe-reauth fuzz-symcc-never-errors fuzz-symcc-always-matches fuzz-symcc-never-matches fuzz-symcc-always-allows fuzz-symcc-always-denies fuzz-symcc-matches-equiv fuzz-symcc-matches-implies fuzz-symcc-matches-disjoint fuzz-symcc-equiv fuzz-symcc-implies fuzz-symcc-disjoint fuzz-symcc-withcex fuzz-symcc-all corpus corpus-from-drt corpus-full corpus-expanded corpus-validation corpus-validation-expanded clean help
 
 all: proto build
 
@@ -724,6 +724,39 @@ fuzz-symcc-implies: proto
 	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
 	$(SMT_ENV) \
 	go test -fuzz='^FuzzSymCCImplies$$' -fuzztime=5m $(FUZZ_PARALLEL_FLAG) ./fuzz/
+
+## fuzz-symcc-matches-disjoint: Run SymCC matchesDisjoint fuzzing (requires cvc5)
+## Tests that two policies' conditions are mutually exclusive
+fuzz-symcc-matches-disjoint: proto
+	@if [ -z "$(HAS_SMT_SOLVER)" ]; then echo "Error: No SMT solver found. Install cvc5 or z3."; exit 1; fi
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
+	go test -fuzz='^FuzzSymCCMatchesDisjoint$$' -fuzztime=5m $(FUZZ_PARALLEL_FLAG) ./fuzz/
+
+## fuzz-symcc-disjoint: Run SymCC disjoint fuzzing (requires cvc5)
+## Tests that two policy sets never both allow the same request
+fuzz-symcc-disjoint: proto
+	@if [ -z "$(HAS_SMT_SOLVER)" ]; then echo "Error: No SMT solver found. Install cvc5 or z3."; exit 1; fi
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
+	go test -fuzz='^FuzzSymCCDisjoint$$' -fuzztime=5m $(FUZZ_PARALLEL_FLAG) ./fuzz/
+
+## fuzz-symcc-withcex: Run SymCC counterexample consistency fuzzing (requires cvc5)
+## Verifies that base checks and WithCex variants agree
+fuzz-symcc-withcex: proto
+	@if [ -z "$(HAS_SMT_SOLVER)" ]; then echo "Error: No SMT solver found. Install cvc5 or z3."; exit 1; fi
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
+	go test -fuzz='^FuzzSymCCWithCexConsistency$$' -fuzztime=5m $(FUZZ_PARALLEL_FLAG) ./fuzz/
 
 ## fuzz-symcc-all: Run stable SymCC fuzz targets (requires cvc5)
 ## Note: Run 'ulimit -n 10240' first to avoid "too many open files" errors

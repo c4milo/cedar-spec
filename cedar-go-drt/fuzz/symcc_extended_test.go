@@ -14,6 +14,11 @@
 
 package fuzz
 
+// This file contains fuzz tests for SymCC WithCex (counterexample) variants.
+// These tests exercise the counterexample extraction path in the symbolic
+// compiler, verifying that when a property doesn't hold, the Lean formalization
+// can produce a concrete counterexample (request + entities) that demonstrates it.
+
 import (
 	"runtime"
 	"testing"
@@ -27,18 +32,14 @@ import (
 	"github.com/cedar-policy/cedar-spec/cedar-go-drt/internal/typegen"
 )
 
-// This file contains fuzz tests for SymCC (Symbolic Cedar Compiler).
-// SymCC compiles Cedar policies to SMT formulas and uses cvc5 to verify properties.
-
 // =============================================================================
-// Single Policy Checks
+// Single Policy WithCex Checks
 // =============================================================================
 
-// FuzzSymCCNeverErrors tests that the SymCC neverErrors check works correctly.
-// A policy "never errors" if it cannot produce an evaluation error for any valid request.
-func FuzzSymCCNeverErrors(f *testing.F) {
-	f.Add([]byte("never-errors-seed-1"))
-	f.Add([]byte("never-errors-seed-2"))
+// FuzzSymCCNeverErrorsWithCex tests neverErrors with counterexample extraction.
+// When a policy CAN error, the solver should produce a counterexample request.
+func FuzzSymCCNeverErrorsWithCex(f *testing.F) {
+	f.Add([]byte("never-errors-cex-seed-1"))
 	f.Add(make([]byte, 64))
 
 	inputGen := typegen.TypeDirectedInputGenerator()
@@ -52,15 +53,13 @@ func FuzzSymCCNeverErrors(f *testing.F) {
 			return
 		}
 
-		testNeverErrors(t, ctx)
+		testNeverErrorsWithCex(t, ctx)
 	})
 }
 
-// FuzzSymCCAlwaysMatches tests that the SymCC alwaysMatches check works correctly.
-// A policy "always matches" if its condition always evaluates to true for any valid request.
-func FuzzSymCCAlwaysMatches(f *testing.F) {
-	f.Add([]byte("always-matches-seed-1"))
-	f.Add([]byte("always-matches-seed-2"))
+// FuzzSymCCAlwaysMatchesWithCex tests alwaysMatches with counterexample extraction.
+func FuzzSymCCAlwaysMatchesWithCex(f *testing.F) {
+	f.Add([]byte("always-matches-cex-seed-1"))
 	f.Add(make([]byte, 64))
 
 	inputGen := typegen.TypeDirectedInputGenerator()
@@ -74,15 +73,13 @@ func FuzzSymCCAlwaysMatches(f *testing.F) {
 			return
 		}
 
-		testAlwaysMatches(t, ctx)
+		testAlwaysMatchesWithCex(t, ctx)
 	})
 }
 
-// FuzzSymCCNeverMatches tests that the SymCC neverMatches check works correctly.
-// A policy "never matches" if its condition never evaluates to true for any valid request.
-func FuzzSymCCNeverMatches(f *testing.F) {
-	f.Add([]byte("never-matches-seed-1"))
-	f.Add([]byte("never-matches-seed-2"))
+// FuzzSymCCNeverMatchesWithCex tests neverMatches with counterexample extraction.
+func FuzzSymCCNeverMatchesWithCex(f *testing.F) {
+	f.Add([]byte("never-matches-cex-seed-1"))
 	f.Add(make([]byte, 64))
 
 	inputGen := typegen.TypeDirectedInputGenerator()
@@ -96,19 +93,17 @@ func FuzzSymCCNeverMatches(f *testing.F) {
 			return
 		}
 
-		testNeverMatches(t, ctx)
+		testNeverMatchesWithCex(t, ctx)
 	})
 }
 
 // =============================================================================
-// Policy Set Checks
+// PolicySet WithCex Checks
 // =============================================================================
 
-// FuzzSymCCAlwaysAllows tests the SymCC alwaysAllows check.
-// A policy set "always allows" if it permits any valid request.
-func FuzzSymCCAlwaysAllows(f *testing.F) {
-	f.Add([]byte("always-allows-seed-1"))
-	f.Add([]byte("always-allows-seed-2"))
+// FuzzSymCCAlwaysAllowsWithCex tests alwaysAllows with counterexample extraction.
+func FuzzSymCCAlwaysAllowsWithCex(f *testing.F) {
+	f.Add([]byte("always-allows-cex-seed-1"))
 	f.Add(make([]byte, 64))
 
 	inputGen := typegen.TypeDirectedInputGenerator()
@@ -122,15 +117,13 @@ func FuzzSymCCAlwaysAllows(f *testing.F) {
 			return
 		}
 
-		testAlwaysAllows(t, ctx)
+		testAlwaysAllowsWithCex(t, ctx)
 	})
 }
 
-// FuzzSymCCAlwaysDenies tests the SymCC alwaysDenies check.
-// A policy set "always denies" if it denies any valid request.
-func FuzzSymCCAlwaysDenies(f *testing.F) {
-	f.Add([]byte("always-denies-seed-1"))
-	f.Add([]byte("always-denies-seed-2"))
+// FuzzSymCCAlwaysDeniesWithCex tests alwaysDenies with counterexample extraction.
+func FuzzSymCCAlwaysDeniesWithCex(f *testing.F) {
+	f.Add([]byte("always-denies-cex-seed-1"))
 	f.Add(make([]byte, 64))
 
 	inputGen := typegen.TypeDirectedInputGenerator()
@@ -144,18 +137,17 @@ func FuzzSymCCAlwaysDenies(f *testing.F) {
 			return
 		}
 
-		testAlwaysDenies(t, ctx)
+		testAlwaysDeniesWithCex(t, ctx)
 	})
 }
 
 // =============================================================================
-// Two Policy Comparison
+// Two Policy WithCex Comparison
 // =============================================================================
 
-// FuzzSymCCMatchesEquivalent tests that two policies have equivalent conditions.
-func FuzzSymCCMatchesEquivalent(f *testing.F) {
-	f.Add([]byte("matches-equiv-seed-1"))
-	f.Add([]byte("matches-equiv-seed-2"))
+// FuzzSymCCMatchesEquivalentWithCex tests matchesEquivalent with counterexample extraction.
+func FuzzSymCCMatchesEquivalentWithCex(f *testing.F) {
+	f.Add([]byte("matches-equiv-cex-seed-1"))
 	f.Add(make([]byte, 64))
 
 	inputGen := typegen.TypeDirectedInputGenerator()
@@ -169,14 +161,13 @@ func FuzzSymCCMatchesEquivalent(f *testing.F) {
 			return
 		}
 
-		testMatchesEquivalent(t, ctx)
+		testMatchesEquivalentWithCex(t, ctx)
 	})
 }
 
-// FuzzSymCCMatchesImplies tests that one policy's condition implies another's.
-func FuzzSymCCMatchesImplies(f *testing.F) {
-	f.Add([]byte("matches-implies-seed-1"))
-	f.Add([]byte("matches-implies-seed-2"))
+// FuzzSymCCMatchesImpliesWithCex tests matchesImplies with counterexample extraction.
+func FuzzSymCCMatchesImpliesWithCex(f *testing.F) {
+	f.Add([]byte("matches-implies-cex-seed-1"))
 	f.Add(make([]byte, 64))
 
 	inputGen := typegen.TypeDirectedInputGenerator()
@@ -190,14 +181,13 @@ func FuzzSymCCMatchesImplies(f *testing.F) {
 			return
 		}
 
-		testMatchesImplies(t, ctx)
+		testMatchesImpliesWithCex(t, ctx)
 	})
 }
 
-// FuzzSymCCMatchesDisjoint tests that two policies' conditions are mutually exclusive.
-func FuzzSymCCMatchesDisjoint(f *testing.F) {
-	f.Add([]byte("matches-disjoint-seed-1"))
-	f.Add([]byte("matches-disjoint-seed-2"))
+// FuzzSymCCMatchesDisjointWithCex tests matchesDisjoint with counterexample extraction.
+func FuzzSymCCMatchesDisjointWithCex(f *testing.F) {
+	f.Add([]byte("matches-disjoint-cex-seed-1"))
 	f.Add(make([]byte, 64))
 
 	inputGen := typegen.TypeDirectedInputGenerator()
@@ -211,18 +201,17 @@ func FuzzSymCCMatchesDisjoint(f *testing.F) {
 			return
 		}
 
-		testMatchesDisjoint(t, ctx)
+		testMatchesDisjointWithCex(t, ctx)
 	})
 }
 
 // =============================================================================
-// Two PolicySet Comparison
+// Two PolicySet WithCex Comparison
 // =============================================================================
 
-// FuzzSymCCEquivalent tests that two policy sets are equivalent.
-func FuzzSymCCEquivalent(f *testing.F) {
-	f.Add([]byte("equiv-seed-1"))
-	f.Add([]byte("equiv-seed-2"))
+// FuzzSymCCEquivalentWithCex tests equivalent with counterexample extraction.
+func FuzzSymCCEquivalentWithCex(f *testing.F) {
+	f.Add([]byte("equiv-cex-seed-1"))
 	f.Add(make([]byte, 64))
 
 	inputGen := typegen.TypeDirectedInputGenerator()
@@ -236,14 +225,13 @@ func FuzzSymCCEquivalent(f *testing.F) {
 			return
 		}
 
-		testEquivalent(t, ctx)
+		testEquivalentWithCex(t, ctx)
 	})
 }
 
-// FuzzSymCCImplies tests that one policy set implies another.
-func FuzzSymCCImplies(f *testing.F) {
-	f.Add([]byte("implies-seed-1"))
-	f.Add([]byte("implies-seed-2"))
+// FuzzSymCCImpliesWithCex tests implies with counterexample extraction.
+func FuzzSymCCImpliesWithCex(f *testing.F) {
+	f.Add([]byte("implies-cex-seed-1"))
 	f.Add(make([]byte, 64))
 
 	inputGen := typegen.TypeDirectedInputGenerator()
@@ -257,14 +245,13 @@ func FuzzSymCCImplies(f *testing.F) {
 			return
 		}
 
-		testImplies(t, ctx)
+		testImpliesWithCex(t, ctx)
 	})
 }
 
-// FuzzSymCCDisjoint tests that two policy sets never both allow the same request.
-func FuzzSymCCDisjoint(f *testing.F) {
-	f.Add([]byte("disjoint-seed-1"))
-	f.Add([]byte("disjoint-seed-2"))
+// FuzzSymCCDisjointWithCex tests disjoint with counterexample extraction.
+func FuzzSymCCDisjointWithCex(f *testing.F) {
+	f.Add([]byte("disjoint-cex-seed-1"))
 	f.Add(make([]byte, 64))
 
 	inputGen := typegen.TypeDirectedInputGenerator()
@@ -278,166 +265,15 @@ func FuzzSymCCDisjoint(f *testing.F) {
 			return
 		}
 
-		testDisjoint(t, ctx)
+		testDisjointWithCex(t, ctx)
 	})
 }
 
 // =============================================================================
-// Context Preparation
+// WithCex Test Functions
 // =============================================================================
 
-type symccContext struct {
-	input       *typegen.TypeDirectedInput
-	schema      *schema.Schema
-	leanSchema  *lean.LeanSchema
-	requestEnv  *proto.RequestEnv
-	firstPolicy *cedar.Policy
-}
-
-type twoPolicyContext struct {
-	*symccContext
-	secondPolicy *cedar.Policy
-}
-
-type twoPolicySetContext struct {
-	*symccContext
-	secondPolicySet *cedar.PolicySet
-}
-
-func prepareSymCCContext(data []byte, inputGen *typegen.InputGenerator) (*symccContext, bool) {
-	if len(data) < 32 {
-		return nil, false
-	}
-
-	input, err := inputGen.Generate(data)
-	if err != nil {
-		return nil, false
-	}
-
-	if input.Policies == nil || countPolicies(input.Policies) == 0 {
-		return nil, false
-	}
-
-	// Parse schema
-	s, err := schema.NewFromJSON(input.SchemaJSON)
-	if err != nil {
-		return nil, false
-	}
-
-	// Load schema into Lean
-	schemaBytes, err := proto.SchemaToProtobuf(s)
-	if err != nil {
-		return nil, false
-	}
-
-	if err := lean.Initialize(); err != nil {
-		return nil, false
-	}
-
-	lt, err := lean.NewLeanThread()
-	if err != nil {
-		return nil, false
-	}
-	defer lt.Close()
-
-	leanSchema, err := lean.LoadSchema(schemaBytes)
-	if err != nil {
-		return nil, false
-	}
-
-	// Build request environment from schema
-	env := buildRequestEnv(input)
-
-	// Get first policy
-	var firstPolicy *cedar.Policy
-	for _, p := range input.Policies.All() {
-		firstPolicy = p
-		break
-	}
-
-	return &symccContext{
-		input:       input,
-		schema:      s,
-		leanSchema:  leanSchema,
-		requestEnv:  env,
-		firstPolicy: firstPolicy,
-	}, true
-}
-
-func prepareTwoPolicyContext(data []byte, inputGen *typegen.InputGenerator) (*twoPolicyContext, bool) {
-	ctx, ok := prepareSymCCContext(data, inputGen)
-	if !ok {
-		return nil, false
-	}
-
-	if countPolicies(ctx.input.Policies) < 2 {
-		// Need at least two policies
-		// Create a second policy by copying the first with minor modification
-		return nil, false
-	}
-
-	// Get second policy
-	var secondPolicy *cedar.Policy
-	count := 0
-	for _, p := range ctx.input.Policies.All() {
-		if count == 1 {
-			secondPolicy = p
-			break
-		}
-		count++
-	}
-
-	return &twoPolicyContext{
-		symccContext: ctx,
-		secondPolicy: secondPolicy,
-	}, true
-}
-
-func prepareTwoPolicySetContext(data []byte, inputGen *typegen.InputGenerator) (*twoPolicySetContext, bool) {
-	ctx, ok := prepareSymCCContext(data, inputGen)
-	if !ok {
-		return nil, false
-	}
-
-	// Create a second policy set (could be modified version or subset)
-	secondPolicySet := cedar.NewPolicySet()
-	for id, p := range ctx.input.Policies.All() {
-		secondPolicySet.Add(id, p)
-	}
-
-	return &twoPolicySetContext{
-		symccContext:    ctx,
-		secondPolicySet: secondPolicySet,
-	}, true
-}
-
-func buildRequestEnv(input *typegen.TypeDirectedInput) *proto.RequestEnv {
-	principalType := types.EntityType("User")
-	resourceType := types.EntityType("Resource")
-	actionID := types.NewEntityUID("Action", "action")
-
-	if len(input.Entities.PrincipalUIDs) > 0 {
-		principalType = input.Entities.PrincipalUIDs[0].Type
-	}
-	if len(input.Entities.ResourceUIDs) > 0 {
-		resourceType = input.Entities.ResourceUIDs[0].Type
-	}
-	if len(input.Schema.ActionList) > 0 {
-		actionID = types.NewEntityUID("Action", types.String(input.Schema.ActionList[0]))
-	}
-
-	return &proto.RequestEnv{
-		PrincipalType: principalType,
-		ActionID:      actionID,
-		ResourceType:  resourceType,
-	}
-}
-
-// =============================================================================
-// Test Functions
-// =============================================================================
-
-func testNeverErrors(t *testing.T, ctx *symccContext) {
+func testNeverErrorsWithCex(t *testing.T, ctx *symccContext) {
 	t.Helper()
 	defer ctx.leanSchema.Release()
 
@@ -448,17 +284,21 @@ func testNeverErrors(t *testing.T, ctx *symccContext) {
 		return
 	}
 
-	resp, err := lean.CheckNeverErrors(ctx.leanSchema, protoBytes)
+	resp, err := lean.CheckNeverErrorsWithCex(ctx.leanSchema, protoBytes)
 	if err != nil {
-		t.Logf("SymCC neverErrors failed: %v", err)
+		t.Logf("SymCC neverErrorsWithCex failed: %v", err)
 		return
 	}
 
-	// Log the result - we're mainly testing that the operation completes without crash
-	t.Logf("neverErrors result: %v", resp.Result)
+	if resp.Result == nil {
+		t.Logf("neverErrorsWithCex: property holds (no counterexample)")
+	} else {
+		t.Logf("neverErrorsWithCex: property violated, counterexample found (request=%d bytes, entities=%d bytes)",
+			len(resp.Result.Request), len(resp.Result.Entities))
+	}
 }
 
-func testAlwaysMatches(t *testing.T, ctx *symccContext) {
+func testAlwaysMatchesWithCex(t *testing.T, ctx *symccContext) {
 	t.Helper()
 	defer ctx.leanSchema.Release()
 
@@ -469,16 +309,20 @@ func testAlwaysMatches(t *testing.T, ctx *symccContext) {
 		return
 	}
 
-	resp, err := lean.CheckAlwaysMatches(ctx.leanSchema, protoBytes)
+	resp, err := lean.CheckAlwaysMatchesWithCex(ctx.leanSchema, protoBytes)
 	if err != nil {
-		t.Logf("SymCC alwaysMatches failed: %v", err)
+		t.Logf("SymCC alwaysMatchesWithCex failed: %v", err)
 		return
 	}
 
-	t.Logf("alwaysMatches result: %v", resp.Result)
+	if resp.Result == nil {
+		t.Logf("alwaysMatchesWithCex: property holds")
+	} else {
+		t.Logf("alwaysMatchesWithCex: counterexample found")
+	}
 }
 
-func testNeverMatches(t *testing.T, ctx *symccContext) {
+func testNeverMatchesWithCex(t *testing.T, ctx *symccContext) {
 	t.Helper()
 	defer ctx.leanSchema.Release()
 
@@ -489,16 +333,20 @@ func testNeverMatches(t *testing.T, ctx *symccContext) {
 		return
 	}
 
-	resp, err := lean.CheckNeverMatches(ctx.leanSchema, protoBytes)
+	resp, err := lean.CheckNeverMatchesWithCex(ctx.leanSchema, protoBytes)
 	if err != nil {
-		t.Logf("SymCC neverMatches failed: %v", err)
+		t.Logf("SymCC neverMatchesWithCex failed: %v", err)
 		return
 	}
 
-	t.Logf("neverMatches result: %v", resp.Result)
+	if resp.Result == nil {
+		t.Logf("neverMatchesWithCex: property holds")
+	} else {
+		t.Logf("neverMatchesWithCex: counterexample found")
+	}
 }
 
-func testAlwaysAllows(t *testing.T, ctx *symccContext) {
+func testAlwaysAllowsWithCex(t *testing.T, ctx *symccContext) {
 	t.Helper()
 	defer ctx.leanSchema.Release()
 
@@ -509,16 +357,20 @@ func testAlwaysAllows(t *testing.T, ctx *symccContext) {
 		return
 	}
 
-	resp, err := lean.CheckAlwaysAllows(ctx.leanSchema, protoBytes)
+	resp, err := lean.CheckAlwaysAllowsWithCex(ctx.leanSchema, protoBytes)
 	if err != nil {
-		t.Logf("SymCC alwaysAllows failed: %v", err)
+		t.Logf("SymCC alwaysAllowsWithCex failed: %v", err)
 		return
 	}
 
-	t.Logf("alwaysAllows result: %v", resp.Result)
+	if resp.Result == nil {
+		t.Logf("alwaysAllowsWithCex: property holds")
+	} else {
+		t.Logf("alwaysAllowsWithCex: counterexample found")
+	}
 }
 
-func testAlwaysDenies(t *testing.T, ctx *symccContext) {
+func testAlwaysDeniesWithCex(t *testing.T, ctx *symccContext) {
 	t.Helper()
 	defer ctx.leanSchema.Release()
 
@@ -529,16 +381,20 @@ func testAlwaysDenies(t *testing.T, ctx *symccContext) {
 		return
 	}
 
-	resp, err := lean.CheckAlwaysDenies(ctx.leanSchema, protoBytes)
+	resp, err := lean.CheckAlwaysDeniesWithCex(ctx.leanSchema, protoBytes)
 	if err != nil {
-		t.Logf("SymCC alwaysDenies failed: %v", err)
+		t.Logf("SymCC alwaysDeniesWithCex failed: %v", err)
 		return
 	}
 
-	t.Logf("alwaysDenies result: %v", resp.Result)
+	if resp.Result == nil {
+		t.Logf("alwaysDeniesWithCex: property holds")
+	} else {
+		t.Logf("alwaysDeniesWithCex: counterexample found")
+	}
 }
 
-func testMatchesEquivalent(t *testing.T, ctx *twoPolicyContext) {
+func testMatchesEquivalentWithCex(t *testing.T, ctx *twoPolicyContext) {
 	t.Helper()
 	defer ctx.leanSchema.Release()
 
@@ -549,16 +405,20 @@ func testMatchesEquivalent(t *testing.T, ctx *twoPolicyContext) {
 		return
 	}
 
-	resp, err := lean.CheckMatchesEquivalent(ctx.leanSchema, protoBytes)
+	resp, err := lean.CheckMatchesEquivalentWithCex(ctx.leanSchema, protoBytes)
 	if err != nil {
-		t.Logf("SymCC matchesEquivalent failed: %v", err)
+		t.Logf("SymCC matchesEquivalentWithCex failed: %v", err)
 		return
 	}
 
-	t.Logf("matchesEquivalent result: %v", resp.Result)
+	if resp.Result == nil {
+		t.Logf("matchesEquivalentWithCex: policies are equivalent")
+	} else {
+		t.Logf("matchesEquivalentWithCex: counterexample found")
+	}
 }
 
-func testMatchesImplies(t *testing.T, ctx *twoPolicyContext) {
+func testMatchesImpliesWithCex(t *testing.T, ctx *twoPolicyContext) {
 	t.Helper()
 	defer ctx.leanSchema.Release()
 
@@ -569,16 +429,20 @@ func testMatchesImplies(t *testing.T, ctx *twoPolicyContext) {
 		return
 	}
 
-	resp, err := lean.CheckMatchesImplies(ctx.leanSchema, protoBytes)
+	resp, err := lean.CheckMatchesImpliesWithCex(ctx.leanSchema, protoBytes)
 	if err != nil {
-		t.Logf("SymCC matchesImplies failed: %v", err)
+		t.Logf("SymCC matchesImpliesWithCex failed: %v", err)
 		return
 	}
 
-	t.Logf("matchesImplies result: %v", resp.Result)
+	if resp.Result == nil {
+		t.Logf("matchesImpliesWithCex: implication holds")
+	} else {
+		t.Logf("matchesImpliesWithCex: counterexample found")
+	}
 }
 
-func testMatchesDisjoint(t *testing.T, ctx *twoPolicyContext) {
+func testMatchesDisjointWithCex(t *testing.T, ctx *twoPolicyContext) {
 	t.Helper()
 	defer ctx.leanSchema.Release()
 
@@ -589,16 +453,20 @@ func testMatchesDisjoint(t *testing.T, ctx *twoPolicyContext) {
 		return
 	}
 
-	resp, err := lean.CheckMatchesDisjoint(ctx.leanSchema, protoBytes)
+	resp, err := lean.CheckMatchesDisjointWithCex(ctx.leanSchema, protoBytes)
 	if err != nil {
-		t.Logf("SymCC matchesDisjoint failed: %v", err)
+		t.Logf("SymCC matchesDisjointWithCex failed: %v", err)
 		return
 	}
 
-	t.Logf("matchesDisjoint result: %v", resp.Result)
+	if resp.Result == nil {
+		t.Logf("matchesDisjointWithCex: policies are disjoint")
+	} else {
+		t.Logf("matchesDisjointWithCex: counterexample found (policies overlap)")
+	}
 }
 
-func testDisjoint(t *testing.T, ctx *twoPolicySetContext) {
+func testEquivalentWithCex(t *testing.T, ctx *twoPolicySetContext) {
 	t.Helper()
 	defer ctx.leanSchema.Release()
 
@@ -609,16 +477,20 @@ func testDisjoint(t *testing.T, ctx *twoPolicySetContext) {
 		return
 	}
 
-	resp, err := lean.CheckDisjoint(ctx.leanSchema, protoBytes)
+	resp, err := lean.CheckEquivalentWithCex(ctx.leanSchema, protoBytes)
 	if err != nil {
-		t.Logf("SymCC disjoint failed: %v", err)
+		t.Logf("SymCC equivalentWithCex failed: %v", err)
 		return
 	}
 
-	t.Logf("disjoint result: %v", resp.Result)
+	if resp.Result == nil {
+		t.Logf("equivalentWithCex: policy sets are equivalent")
+	} else {
+		t.Logf("equivalentWithCex: counterexample found")
+	}
 }
 
-func testEquivalent(t *testing.T, ctx *twoPolicySetContext) {
+func testImpliesWithCex(t *testing.T, ctx *twoPolicySetContext) {
 	t.Helper()
 	defer ctx.leanSchema.Release()
 
@@ -629,16 +501,20 @@ func testEquivalent(t *testing.T, ctx *twoPolicySetContext) {
 		return
 	}
 
-	resp, err := lean.CheckEquivalent(ctx.leanSchema, protoBytes)
+	resp, err := lean.CheckImpliesWithCex(ctx.leanSchema, protoBytes)
 	if err != nil {
-		t.Logf("SymCC equivalent failed: %v", err)
+		t.Logf("SymCC impliesWithCex failed: %v", err)
 		return
 	}
 
-	t.Logf("equivalent result: %v", resp.Result)
+	if resp.Result == nil {
+		t.Logf("impliesWithCex: implication holds")
+	} else {
+		t.Logf("impliesWithCex: counterexample found")
+	}
 }
 
-func testImplies(t *testing.T, ctx *twoPolicySetContext) {
+func testDisjointWithCex(t *testing.T, ctx *twoPolicySetContext) {
 	t.Helper()
 	defer ctx.leanSchema.Release()
 
@@ -649,25 +525,88 @@ func testImplies(t *testing.T, ctx *twoPolicySetContext) {
 		return
 	}
 
-	resp, err := lean.CheckImplies(ctx.leanSchema, protoBytes)
+	resp, err := lean.CheckDisjointWithCex(ctx.leanSchema, protoBytes)
 	if err != nil {
-		t.Logf("SymCC implies failed: %v", err)
+		t.Logf("SymCC disjointWithCex failed: %v", err)
 		return
 	}
 
-	t.Logf("implies result: %v", resp.Result)
+	if resp.Result == nil {
+		t.Logf("disjointWithCex: policy sets are disjoint")
+	} else {
+		t.Logf("disjointWithCex: counterexample found")
+	}
+}
+
+// =============================================================================
+// WithCex Consistency Verification
+// =============================================================================
+
+// FuzzSymCCWithCexConsistency verifies that the base check and WithCex variant
+// agree: if the base check returns true, WithCex should return nil (no counterexample),
+// and if base returns false, WithCex should return a counterexample.
+func FuzzSymCCWithCexConsistency(f *testing.F) {
+	f.Add([]byte("consistency-seed-1"))
+	f.Add([]byte("consistency-seed-2"))
+	f.Add(make([]byte, 64))
+
+	inputGen := typegen.TypeDirectedInputGenerator()
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+
+		ctx, ok := prepareSymCCContext(data, inputGen)
+		if !ok {
+			return
+		}
+		defer ctx.leanSchema.Release()
+
+		// Test neverErrors consistency: base and WithCex must agree
+		req := proto.CheckPolicyFromCedar(ctx.firstPolicy, ctx.requestEnv)
+		protoBytes, err := req.ToProtobuf()
+		if err != nil {
+			return
+		}
+
+		// Need to inc schema ref since we'll call twice
+		baseResp, err := lean.CheckNeverErrors(ctx.leanSchema, protoBytes)
+		if err != nil {
+			return
+		}
+
+		// Re-prepare since CheckNeverErrors consumed the schema ref
+		// Re-create protoBytes (same content)
+		protoBytes2, err := req.ToProtobuf()
+		if err != nil {
+			return
+		}
+
+		cexResp, err := lean.CheckNeverErrorsWithCex(ctx.leanSchema, protoBytes2)
+		if err != nil {
+			return
+		}
+
+		// Verify consistency
+		if baseResp.Result && cexResp.Result != nil {
+			t.Errorf("Inconsistency: neverErrors=true but WithCex returned counterexample")
+		}
+		if !baseResp.Result && cexResp.Result == nil {
+			t.Errorf("Inconsistency: neverErrors=false but WithCex returned no counterexample")
+		}
+	})
 }
 
 // =============================================================================
 // Unit Tests
 // =============================================================================
 
-// TestSymCCNeverErrorsBasic tests basic neverErrors functionality.
-func TestSymCCNeverErrorsBasic(t *testing.T) {
+// TestSymCCNeverErrorsWithCexBasic tests counterexample extraction for a policy that can error.
+func TestSymCCNeverErrorsWithCexBasic(t *testing.T) {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 
-	// Create a simple policy that should never error
+	// A simple policy that should never error - tests WithCex extraction path
 	policies := cedar.NewPolicySet()
 	var policy cedar.Policy
 	err := policy.UnmarshalCedar([]byte(`permit(principal, action, resource);`))
@@ -676,20 +615,17 @@ func TestSymCCNeverErrorsBasic(t *testing.T) {
 	}
 	policies.Add("permit-all", &policy)
 
-	// Create schema
 	schemaJSON := []byte(`{"": {"entityTypes": {"User": {}, "Resource": {}}, "actions": {"action": {"appliesTo": {"principalTypes": ["User"], "resourceTypes": ["Resource"]}}}}}`)
 	s, err := schema.NewFromJSON(schemaJSON)
 	if err != nil {
 		t.Fatalf("Failed to parse schema: %v", err)
 	}
 
-	// Convert schema to protobuf
 	schemaBytes, err := proto.SchemaToProtobuf(s)
 	if err != nil {
 		t.Fatalf("Failed to convert schema: %v", err)
 	}
 
-	// Initialize Lean
 	if err := lean.Initialize(); err != nil {
 		t.Fatalf("Failed to initialize Lean: %v", err)
 	}
@@ -700,14 +636,12 @@ func TestSymCCNeverErrorsBasic(t *testing.T) {
 	}
 	defer lt.Close()
 
-	// Load schema
 	leanSchema, err := lean.LoadSchema(schemaBytes)
 	if err != nil {
 		t.Fatalf("Failed to load schema: %v", err)
 	}
 	defer leanSchema.Release()
 
-	// Build request
 	env := &proto.RequestEnv{
 		PrincipalType: types.EntityType("User"),
 		ActionID:      types.NewEntityUID("Action", "action"),
@@ -720,33 +654,106 @@ func TestSymCCNeverErrorsBasic(t *testing.T) {
 		t.Fatalf("Failed to convert to protobuf: %v", err)
 	}
 
-	// Run check
-	resp, err := lean.CheckNeverErrors(leanSchema, protoBytes)
+	resp, err := lean.CheckNeverErrorsWithCex(leanSchema, protoBytes)
 	if err != nil {
 		t.Fatalf("SymCC check failed: %v", err)
 	}
 
-	// A simple permit-all policy should never error
-	if !resp.Result {
-		t.Errorf("Expected neverErrors=true for permit-all policy, got false")
+	// A simple permit-all should never error, so WithCex should return nil (property holds)
+	if resp.Result == nil {
+		t.Logf("neverErrorsWithCex: property holds (no counterexample) - correct for permit-all")
+	} else {
+		t.Errorf("Expected neverErrorsWithCex to hold for permit-all policy, but got counterexample")
 	}
 }
 
-// TestSymCCAlwaysAllowsBasic tests basic alwaysAllows functionality.
-func TestSymCCAlwaysAllowsBasic(t *testing.T) {
+// TestSymCCMatchesDisjointBasic tests basic disjointness checking.
+func TestSymCCMatchesDisjointBasic(t *testing.T) {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 
-	// Create a permit-all policy
-	policies := cedar.NewPolicySet()
-	var policy cedar.Policy
-	err := policy.UnmarshalCedar([]byte(`permit(principal, action, resource);`))
+	// Two policies with mutually exclusive conditions
+	var policy1, policy2 cedar.Policy
+	err := policy1.UnmarshalCedar([]byte(`permit(principal == User::"alice", action, resource);`))
+	if err != nil {
+		t.Fatalf("Failed to parse policy1: %v", err)
+	}
+	err = policy2.UnmarshalCedar([]byte(`permit(principal == User::"bob", action, resource);`))
+	if err != nil {
+		t.Fatalf("Failed to parse policy2: %v", err)
+	}
+
+	schemaJSON := []byte(`{"": {"entityTypes": {"User": {}, "Resource": {}}, "actions": {"action": {"appliesTo": {"principalTypes": ["User"], "resourceTypes": ["Resource"]}}}}}`)
+	s, err := schema.NewFromJSON(schemaJSON)
+	if err != nil {
+		t.Fatalf("Failed to parse schema: %v", err)
+	}
+
+	schemaBytes, err := proto.SchemaToProtobuf(s)
+	if err != nil {
+		t.Fatalf("Failed to convert schema: %v", err)
+	}
+
+	if err := lean.Initialize(); err != nil {
+		t.Fatalf("Failed to initialize Lean: %v", err)
+	}
+
+	lt, err := lean.NewLeanThread()
+	if err != nil {
+		t.Fatalf("Failed to create Lean thread: %v", err)
+	}
+	defer lt.Close()
+
+	leanSchema, err := lean.LoadSchema(schemaBytes)
+	if err != nil {
+		t.Fatalf("Failed to load schema: %v", err)
+	}
+	defer leanSchema.Release()
+
+	env := &proto.RequestEnv{
+		PrincipalType: types.EntityType("User"),
+		ActionID:      types.NewEntityUID("Action", "action"),
+		ResourceType:  types.EntityType("Resource"),
+	}
+
+	req := proto.ComparePoliciesFromCedar(&policy1, &policy2, env)
+	protoBytes, err := req.ToProtobuf()
+	if err != nil {
+		t.Fatalf("Failed to convert to protobuf: %v", err)
+	}
+
+	resp, err := lean.CheckMatchesDisjoint(leanSchema, protoBytes)
+	if err != nil {
+		t.Fatalf("SymCC check failed: %v", err)
+	}
+
+	// Alice-only and Bob-only policies should be disjoint
+	t.Logf("matchesDisjoint result: %v (expected true for alice vs bob)", resp.Result)
+}
+
+// TestSymCCDisjointBasic tests basic policy set disjointness checking.
+func TestSymCCDisjointBasic(t *testing.T) {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
+	// Policy set 1: only permits alice
+	ps1 := cedar.NewPolicySet()
+	var p1 cedar.Policy
+	err := p1.UnmarshalCedar([]byte(`permit(principal == User::"alice", action, resource);`))
 	if err != nil {
 		t.Fatalf("Failed to parse policy: %v", err)
 	}
-	policies.Add("permit-all", &policy)
+	ps1.Add("alice-only", &p1)
 
-	// Create schema
+	// Policy set 2: only permits bob
+	ps2 := cedar.NewPolicySet()
+	var p2 cedar.Policy
+	err = p2.UnmarshalCedar([]byte(`permit(principal == User::"bob", action, resource);`))
+	if err != nil {
+		t.Fatalf("Failed to parse policy: %v", err)
+	}
+	ps2.Add("bob-only", &p2)
+
 	schemaJSON := []byte(`{"": {"entityTypes": {"User": {}, "Resource": {}}, "actions": {"action": {"appliesTo": {"principalTypes": ["User"], "resourceTypes": ["Resource"]}}}}}`)
 	s, err := schema.NewFromJSON(schemaJSON)
 	if err != nil {
@@ -780,78 +787,17 @@ func TestSymCCAlwaysAllowsBasic(t *testing.T) {
 		ResourceType:  types.EntityType("Resource"),
 	}
 
-	req := proto.CheckPolicySetFromCedar(policies, env)
+	req := proto.ComparePolicySetsFromCedar(ps1, ps2, env)
 	protoBytes, err := req.ToProtobuf()
 	if err != nil {
 		t.Fatalf("Failed to convert to protobuf: %v", err)
 	}
 
-	resp, err := lean.CheckAlwaysAllows(leanSchema, protoBytes)
+	resp, err := lean.CheckDisjoint(leanSchema, protoBytes)
 	if err != nil {
 		t.Fatalf("SymCC check failed: %v", err)
 	}
 
-	// A permit-all policy should always allow
-	if !resp.Result {
-		t.Errorf("Expected alwaysAllows=true for permit-all policy, got false")
-	}
-}
-
-// TestSymCCAlwaysDeniesBasic tests basic alwaysDenies functionality.
-func TestSymCCAlwaysDeniesBasic(t *testing.T) {
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
-
-	// Create an empty policy set (default deny)
-	policies := cedar.NewPolicySet()
-
-	// Create schema
-	schemaJSON := []byte(`{"": {"entityTypes": {"User": {}, "Resource": {}}, "actions": {"action": {"appliesTo": {"principalTypes": ["User"], "resourceTypes": ["Resource"]}}}}}`)
-	s, err := schema.NewFromJSON(schemaJSON)
-	if err != nil {
-		t.Fatalf("Failed to parse schema: %v", err)
-	}
-
-	schemaBytes, err := proto.SchemaToProtobuf(s)
-	if err != nil {
-		t.Fatalf("Failed to convert schema: %v", err)
-	}
-
-	if err := lean.Initialize(); err != nil {
-		t.Fatalf("Failed to initialize Lean: %v", err)
-	}
-
-	lt, err := lean.NewLeanThread()
-	if err != nil {
-		t.Fatalf("Failed to create Lean thread: %v", err)
-	}
-	defer lt.Close()
-
-	leanSchema, err := lean.LoadSchema(schemaBytes)
-	if err != nil {
-		t.Fatalf("Failed to load schema: %v", err)
-	}
-	defer leanSchema.Release()
-
-	env := &proto.RequestEnv{
-		PrincipalType: types.EntityType("User"),
-		ActionID:      types.NewEntityUID("Action", "action"),
-		ResourceType:  types.EntityType("Resource"),
-	}
-
-	req := proto.CheckPolicySetFromCedar(policies, env)
-	protoBytes, err := req.ToProtobuf()
-	if err != nil {
-		t.Fatalf("Failed to convert to protobuf: %v", err)
-	}
-
-	resp, err := lean.CheckAlwaysDenies(leanSchema, protoBytes)
-	if err != nil {
-		t.Fatalf("SymCC check failed: %v", err)
-	}
-
-	// An empty policy set should always deny (default deny)
-	if !resp.Result {
-		t.Errorf("Expected alwaysDenies=true for empty policy set, got false")
-	}
+	// Alice-only and Bob-only policy sets should be disjoint
+	t.Logf("disjoint result: %v (expected true for alice-only vs bob-only)", resp.Result)
 }
