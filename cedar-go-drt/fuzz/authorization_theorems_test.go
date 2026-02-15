@@ -1113,3 +1113,443 @@ func TestUnchangedErroringWhenAddPolicy(t *testing.T) {
 		}
 	}
 }
+
+// ---------- Proposed theorems (not yet in Lean formalization) ----------
+
+// FuzzErrorIrrelevance verifies that erroring policies never influence the
+// authorization decision. Replacing every erroring policy with a trivially-false
+// policy of the same effect must preserve the decision. This guarantees that
+// runtime evaluation errors (missing attributes, type mismatches) can never
+// escalate privileges.
+func FuzzErrorIrrelevance(f *testing.F) {
+	f.Add([]byte("error-irrel-seed-1"))
+	f.Add([]byte("error-irrel-seed-2"))
+	f.Add(make([]byte, 64))
+
+	inputGen := typegen.TypeDirectedInputGenerator()
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		if len(data) < 16 {
+			return
+		}
+
+		input, err := inputGen.Generate(data)
+		if err != nil {
+			return
+		}
+
+		request := buildRequest(input)
+		decision, diag := cedar.Authorize(input.Policies, input.Entities.Entities, request)
+
+		if len(diag.Errors) == 0 {
+			return // No erroring policies, nothing to test
+		}
+
+		// Build set of erroring policy IDs
+		erroring := make(map[types.PolicyID]bool)
+		for _, diagErr := range diag.Errors {
+			erroring[diagErr.PolicyID] = true
+		}
+
+		// Replace erroring policies with trivially-false equivalents
+		replacedPolicies := cedar.NewPolicySet()
+		for id, p := range input.Policies.All() {
+			if erroring[id] {
+				var replacement cedar.Policy
+				if p.Effect() == cedar.Permit {
+					if err := replacement.UnmarshalCedar([]byte(`permit(principal, action, resource) when { false };`)); err != nil {
+						return
+					}
+				} else {
+					if err := replacement.UnmarshalCedar([]byte(`forbid(principal, action, resource) when { false };`)); err != nil {
+						return
+					}
+				}
+				replacedPolicies.Add(id, &replacement)
+			} else {
+				replacedPolicies.Add(id, p)
+			}
+		}
+
+		newDecision, _ := cedar.Authorize(replacedPolicies, input.Entities.Entities, request)
+
+		if decision != newDecision {
+			t.Errorf("error_irrelevance violated:\n"+
+				"Original decision=%v, after replacing %d erroring policies with false: %v\n"+
+				"Request: %+v",
+				decision, len(diag.Errors), newDecision, request)
+		}
+	})
+}
+
+// FuzzRemovingForbidPreservesAllow verifies that removing a forbid policy from a
+// policy set that allows a request can never flip the decision to Deny. This is
+// the removal dual of unchanged_allow_when_add_permit.
+func FuzzRemovingForbidPreservesAllow(f *testing.F) {
+	f.Add([]byte("rm-forbid-seed-1"))
+	f.Add([]byte("rm-forbid-seed-2"))
+	f.Add(make([]byte, 64))
+
+	inputGen := typegen.TypeDirectedInputGenerator()
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		if len(data) < 16 {
+			return
+		}
+
+		input, err := inputGen.Generate(data)
+		if err != nil {
+			return
+		}
+
+		request := buildRequest(input)
+		decision, _ := cedar.Authorize(input.Policies, input.Entities.Entities, request)
+
+		if decision != cedar.Allow {
+			return // Theorem only applies when original decision is Allow
+		}
+
+		// Remove each forbid policy one at a time; decision must stay Allow
+		for id, p := range input.Policies.All() {
+			if p.Effect() != cedar.Forbid {
+				continue
+			}
+
+			reduced := cedar.NewPolicySet()
+			for id2, p2 := range input.Policies.All() {
+				if id2 != id {
+					reduced.Add(id2, p2)
+				}
+			}
+
+			newDecision, _ := cedar.Authorize(reduced, input.Entities.Entities, request)
+			if newDecision != cedar.Allow {
+				t.Errorf("removing_forbid_preserves_allow violated:\n"+
+					"Removing forbid policy %q flipped Allow to %v\n"+
+					"Request: %+v", id, newDecision, request)
+			}
+		}
+	})
+}
+
+// FuzzRemovingPermitPreservesDeny verifies that removing a permit policy from a
+// policy set that denies a request can never flip the decision to Allow. This is
+// the removal dual of unchanged_deny_when_add_forbid.
+func FuzzRemovingPermitPreservesDeny(f *testing.F) {
+	f.Add([]byte("rm-permit-seed-1"))
+	f.Add([]byte("rm-permit-seed-2"))
+	f.Add(make([]byte, 64))
+
+	inputGen := typegen.TypeDirectedInputGenerator()
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		if len(data) < 16 {
+			return
+		}
+
+		input, err := inputGen.Generate(data)
+		if err != nil {
+			return
+		}
+
+		request := buildRequest(input)
+		decision, _ := cedar.Authorize(input.Policies, input.Entities.Entities, request)
+
+		if decision != cedar.Deny {
+			return // Theorem only applies when original decision is Deny
+		}
+
+		// Remove each permit policy one at a time; decision must stay Deny
+		for id, p := range input.Policies.All() {
+			if p.Effect() != cedar.Permit {
+				continue
+			}
+
+			reduced := cedar.NewPolicySet()
+			for id2, p2 := range input.Policies.All() {
+				if id2 != id {
+					reduced.Add(id2, p2)
+				}
+			}
+
+			newDecision, _ := cedar.Authorize(reduced, input.Entities.Entities, request)
+			if newDecision != cedar.Deny {
+				t.Errorf("removing_permit_preserves_deny violated:\n"+
+					"Removing permit policy %q flipped Deny to %v\n"+
+					"Request: %+v", id, newDecision, request)
+			}
+		}
+	})
+}
+
+// FuzzDecisionDecomposition verifies that the authorization decision is fully
+// determined by two bits: "exists a satisfied forbid" and "exists a satisfied
+// permit". Everything else — policy order, duplicates, non-matching policies,
+// erroring policies — is irrelevant. We test this by constructing a canonical
+// policy set from just those two bits and checking the decision matches.
+func FuzzDecisionDecomposition(f *testing.F) {
+	f.Add([]byte("decomp-seed-1"))
+	f.Add([]byte("decomp-seed-2"))
+	f.Add(make([]byte, 64))
+
+	inputGen := typegen.TypeDirectedInputGenerator()
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		if len(data) < 16 {
+			return
+		}
+
+		input, err := inputGen.Generate(data)
+		if err != nil {
+			return
+		}
+
+		request := buildRequest(input)
+		decision, diag := cedar.Authorize(input.Policies, input.Entities.Entities, request)
+
+		// Determine the two bits:
+		// hasSatisfiedForbid: if decision=Allow, no forbids were satisfied (by definition).
+		// If decision=Deny, Reasons = satisfied forbids, so non-empty means yes.
+		hasSatisfiedForbid := (decision == cedar.Deny && len(diag.Reasons) > 0)
+
+		// hasSatisfiedPermit: if decision=Allow, permits were satisfied (by definition).
+		// If decision=Deny, we need to check separately by running with permits only.
+		var hasSatisfiedPermit bool
+		if decision == cedar.Allow {
+			hasSatisfiedPermit = true
+		} else {
+			// Run with only permit policies to check if any are satisfied
+			permitOnly := cedar.NewPolicySet()
+			for id, p := range input.Policies.All() {
+				if p.Effect() == cedar.Permit {
+					permitOnly.Add(id, p)
+				}
+			}
+			permitDecision, _ := cedar.Authorize(permitOnly, input.Entities.Entities, request)
+			hasSatisfiedPermit = (permitDecision == cedar.Allow)
+		}
+
+		// Build canonical policy set from just the two bits
+		canonical := cedar.NewPolicySet()
+		if hasSatisfiedForbid {
+			var forbidAll cedar.Policy
+			if err := forbidAll.UnmarshalCedar([]byte(`forbid(principal, action, resource);`)); err != nil {
+				return
+			}
+			canonical.Add("canonical-forbid", &forbidAll)
+		}
+		if hasSatisfiedPermit {
+			var permitAll cedar.Policy
+			if err := permitAll.UnmarshalCedar([]byte(`permit(principal, action, resource);`)); err != nil {
+				return
+			}
+			canonical.Add("canonical-permit", &permitAll)
+		}
+
+		canonicalDecision, _ := cedar.Authorize(canonical, input.Entities.Entities, request)
+
+		if decision != canonicalDecision {
+			t.Errorf("decision_decomposition violated:\n"+
+				"Original decision=%v, canonical decision=%v\n"+
+				"hasSatisfiedForbid=%v, hasSatisfiedPermit=%v\n"+
+				"Request: %+v",
+				decision, canonicalDecision, hasSatisfiedForbid, hasSatisfiedPermit, request)
+		}
+	})
+}
+
+// ---------- Unit tests for proposed theorems ----------
+
+// TestErrorIrrelevance tests that erroring policies don't affect the decision.
+func TestErrorIrrelevance(t *testing.T) {
+	request := cedar.Request{
+		Principal: types.NewEntityUID("User", "alice"),
+		Action:    types.NewEntityUID("Action", "view"),
+		Resource:  types.NewEntityUID("Doc", "doc1"),
+		Context:   types.NewRecord(types.RecordMap{}),
+	}
+
+	// Policy that errors (accesses missing context attribute)
+	// + policy that permits
+	ps := cedar.NewPolicySet()
+	var permitPolicy cedar.Policy
+	if err := permitPolicy.UnmarshalCedar([]byte(`permit(principal, action, resource);`)); err != nil {
+		t.Fatal(err)
+	}
+	ps.Add("good-permit", &permitPolicy)
+
+	var errorPolicy cedar.Policy
+	if err := errorPolicy.UnmarshalCedar([]byte(
+		`forbid(principal, action, resource) when { context.nonexistent > 0 };`,
+	)); err != nil {
+		t.Fatal(err)
+	}
+	ps.Add("bad-forbid", &errorPolicy)
+
+	decision, diag := cedar.Authorize(ps, types.EntityMap{}, request)
+
+	// The erroring forbid should NOT cause a deny
+	if decision != cedar.Allow {
+		t.Errorf("Expected Allow (erroring forbid should not deny), got %v", decision)
+	}
+	if len(diag.Errors) == 0 {
+		t.Error("Expected at least one erroring policy")
+	}
+
+	// Replace the erroring policy with a trivially-false forbid
+	ps2 := cedar.NewPolicySet()
+	ps2.Add("good-permit", &permitPolicy)
+	var falseForbid cedar.Policy
+	if err := falseForbid.UnmarshalCedar([]byte(`forbid(principal, action, resource) when { false };`)); err != nil {
+		t.Fatal(err)
+	}
+	ps2.Add("bad-forbid", &falseForbid)
+
+	decision2, _ := cedar.Authorize(ps2, types.EntityMap{}, request)
+	if decision != decision2 {
+		t.Errorf("Decisions differ: original=%v, replaced=%v", decision, decision2)
+	}
+}
+
+// TestRemovalDuals tests both removal properties together.
+func TestRemovalDuals(t *testing.T) {
+	request := cedar.Request{
+		Principal: types.NewEntityUID("User", "alice"),
+		Action:    types.NewEntityUID("Action", "view"),
+		Resource:  types.NewEntityUID("Doc", "doc1"),
+		Context:   types.NewRecord(types.RecordMap{}),
+	}
+
+	t.Run("removing forbid preserves Allow", func(t *testing.T) {
+		ps := cedar.NewPolicySet()
+		var permit cedar.Policy
+		if err := permit.UnmarshalCedar([]byte(`permit(principal, action, resource);`)); err != nil {
+			t.Fatal(err)
+		}
+		var forbid cedar.Policy
+		if err := forbid.UnmarshalCedar([]byte(
+			`forbid(principal == User::"bob", action, resource);`,
+		)); err != nil {
+			t.Fatal(err)
+		}
+		ps.Add("permit", &permit)
+		ps.Add("forbid", &forbid)
+
+		decision, _ := cedar.Authorize(ps, types.EntityMap{}, request)
+		if decision != cedar.Allow {
+			t.Fatal("precondition: expected Allow")
+		}
+
+		// Remove the forbid → must still be Allow
+		reduced := cedar.NewPolicySet()
+		reduced.Add("permit", &permit)
+		newDecision, _ := cedar.Authorize(reduced, types.EntityMap{}, request)
+		if newDecision != cedar.Allow {
+			t.Errorf("Expected Allow after removing forbid, got %v", newDecision)
+		}
+	})
+
+	t.Run("removing permit preserves Deny", func(t *testing.T) {
+		ps := cedar.NewPolicySet()
+		var permit cedar.Policy
+		if err := permit.UnmarshalCedar([]byte(
+			`permit(principal == User::"bob", action, resource);`,
+		)); err != nil {
+			t.Fatal(err)
+		}
+		var forbid cedar.Policy
+		if err := forbid.UnmarshalCedar([]byte(`forbid(principal, action, resource);`)); err != nil {
+			t.Fatal(err)
+		}
+		ps.Add("permit", &permit)
+		ps.Add("forbid", &forbid)
+
+		decision, _ := cedar.Authorize(ps, types.EntityMap{}, request)
+		if decision != cedar.Deny {
+			t.Fatal("precondition: expected Deny")
+		}
+
+		// Remove the (unsatisfied) permit → must still be Deny
+		reduced := cedar.NewPolicySet()
+		reduced.Add("forbid", &forbid)
+		newDecision, _ := cedar.Authorize(reduced, types.EntityMap{}, request)
+		if newDecision != cedar.Deny {
+			t.Errorf("Expected Deny after removing permit, got %v", newDecision)
+		}
+	})
+
+	t.Run("removing satisfied permit preserves Deny when forbid present", func(t *testing.T) {
+		ps := cedar.NewPolicySet()
+		var permit cedar.Policy
+		if err := permit.UnmarshalCedar([]byte(`permit(principal, action, resource);`)); err != nil {
+			t.Fatal(err)
+		}
+		var forbid cedar.Policy
+		if err := forbid.UnmarshalCedar([]byte(`forbid(principal, action, resource);`)); err != nil {
+			t.Fatal(err)
+		}
+		ps.Add("permit", &permit)
+		ps.Add("forbid", &forbid)
+
+		decision, _ := cedar.Authorize(ps, types.EntityMap{}, request)
+		if decision != cedar.Deny {
+			t.Fatal("precondition: expected Deny (forbid trumps)")
+		}
+
+		// Remove the satisfied permit → must still be Deny
+		reduced := cedar.NewPolicySet()
+		reduced.Add("forbid", &forbid)
+		newDecision, _ := cedar.Authorize(reduced, types.EntityMap{}, request)
+		if newDecision != cedar.Deny {
+			t.Errorf("Expected Deny after removing permit, got %v", newDecision)
+		}
+	})
+}
+
+// TestDecisionDecomposition tests the fundamental characterization:
+// the decision depends only on (∃ satisfied forbid, ∃ satisfied permit).
+func TestDecisionDecomposition(t *testing.T) {
+	request := cedar.Request{
+		Principal: types.NewEntityUID("User", "alice"),
+		Action:    types.NewEntityUID("Action", "view"),
+		Resource:  types.NewEntityUID("Doc", "doc1"),
+		Context:   types.NewRecord(types.RecordMap{}),
+	}
+
+	tests := []struct {
+		name             string
+		hasForbid        bool
+		hasPermit        bool
+		expectedDecision cedar.Decision
+	}{
+		{"no policies → Deny", false, false, cedar.Deny},
+		{"only permit → Allow", false, true, cedar.Allow},
+		{"only forbid → Deny", true, false, cedar.Deny},
+		{"both → Deny (forbid trumps)", true, true, cedar.Deny},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ps := cedar.NewPolicySet()
+			if tc.hasPermit {
+				var p cedar.Policy
+				if err := p.UnmarshalCedar([]byte(`permit(principal, action, resource);`)); err != nil {
+					t.Fatal(err)
+				}
+				ps.Add("permit", &p)
+			}
+			if tc.hasForbid {
+				var p cedar.Policy
+				if err := p.UnmarshalCedar([]byte(`forbid(principal, action, resource);`)); err != nil {
+					t.Fatal(err)
+				}
+				ps.Add("forbid", &p)
+			}
+
+			decision, _ := cedar.Authorize(ps, types.EntityMap{}, request)
+			if decision != tc.expectedDecision {
+				t.Errorf("expected %v, got %v", tc.expectedDecision, decision)
+			}
+		})
+	}
+}

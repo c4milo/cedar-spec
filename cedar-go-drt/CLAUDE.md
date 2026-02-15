@@ -110,7 +110,7 @@ Compares cedar-go vs Lean results:
 - `CompareValidation()` - Valid/invalid with error messages
 - `CheckTypeSoundness()` - If cedar-go accepts, Lean must too
 
-## Fuzz Targets (75 total)
+## Fuzz Targets (79 total)
 
 ### Authorization Theorems (No Lean Required) ⚡
 Property-based tests verifying Lean authorization theorems:
@@ -125,6 +125,10 @@ Property-based tests verifying Lean authorization theorems:
 | `fuzz-det-err-disjoint` | `determining_erroring_disjoint_when_unique_ids` - determining/erroring are disjoint |
 | `fuzz-unchanged-det` | `unchanged_determining_when_add_policy` - determining preserved if decision unchanged |
 | `fuzz-unchanged-err` | `unchanged_erroring_when_add_policy` - erroring preserved when adding any policy |
+| `fuzz-error-irrel` | `error_irrelevance` - erroring policies never influence the decision |
+| `fuzz-rm-forbid` | `removing_forbid_preserves_allow` - removing forbid can't flip Allow to Deny |
+| `fuzz-rm-permit` | `removing_permit_preserves_deny` - removing permit can't flip Deny to Allow |
+| `fuzz-decomp` | `decision_decomposition` - decision depends only on (∃ forbid, ∃ permit) |
 
 ### Authorization (Lean Required)
 | Make Target | Purpose |
@@ -297,6 +301,12 @@ The **strict validation mode** (`fuzz-val-strict`) catches:
 7. **determining_erroring_disjoint_when_unique_ids**: Determining and erroring policies are disjoint
 8. **unchanged_determining_when_add_policy**: Determining policies preserved when decision unchanged
 9. **unchanged_erroring_when_add_policy**: Erroring policies preserved when adding any policy
+
+### Proposed Authorization Theorems (not yet in Lean formalization)
+10. **error_irrelevance**: Erroring policies never influence the authorization decision
+11. **removing_forbid_preserves_allow**: Removing a forbid can't flip Allow to Deny
+12. **removing_permit_preserves_deny**: Removing a permit can't flip Deny to Allow
+13. **decision_decomposition**: Decision is fully determined by (∃ satisfied forbid, ∃ satisfied permit)
 
 ### DRT Properties
 4. **Soundness**: Partial evaluation preserves authorization decisions

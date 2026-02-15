@@ -75,7 +75,7 @@ SYMCC_FUZZTIME ?= 2m
 FUZZ_PARALLEL ?=
 FUZZ_PARALLEL_FLAG := $(if $(FUZZ_PARALLEL),-parallel=$(FUZZ_PARALLEL))
 
-.PHONY: all lean proto build test test-fuzz test-symcc lint deadcode fmt fuzz-auth fuzz-val fuzz-val-strict fuzz-eval fuzz-eval-td fuzz-eval-ext fuzz-eval-ext-td fuzz-entity-val fuzz-request-val fuzz-level-val fuzz-auth-td fuzz-val-td fuzz-batch fuzz-batch-drt fuzz-roundtrip fuzz-proto-roundtrip fuzz-rbac fuzz-rbac-authorizer fuzz-val-pbt fuzz-val-pbt-td fuzz-wildcard fuzz-partial-eval fuzz-partial-eval-pbt fuzz-policy-cedar-to-json fuzz-policy-json-to-cedar fuzz-tpe-query-principal fuzz-tpe-query-resource fuzz-tpe-query-action fuzz-entity-slicing fuzz-schema-resolution fuzz-input-generation fuzz-parser-crash fuzz-schema-parser fuzz-schema-wf fuzz-schema-wf-td fuzz-forbid-trumps fuzz-default-deny fuzz-order-dup fuzz-denied-iff fuzz-add-permit fuzz-add-forbid fuzz-det-err-disjoint fuzz-unchanged-det fuzz-unchanged-err fuzz-tpe-drt fuzz-tpe-soundness fuzz-tpe-reauth fuzz-symcc-never-errors fuzz-symcc-always-matches fuzz-symcc-never-matches fuzz-symcc-always-allows fuzz-symcc-always-denies fuzz-symcc-matches-equiv fuzz-symcc-matches-implies fuzz-symcc-matches-disjoint fuzz-symcc-equiv fuzz-symcc-implies fuzz-symcc-disjoint fuzz-symcc-withcex fuzz-symcc-all corpus corpus-from-drt corpus-full corpus-expanded corpus-validation corpus-validation-expanded clean help
+.PHONY: all lean proto build test test-fuzz test-symcc lint deadcode fmt fuzz-auth fuzz-val fuzz-val-strict fuzz-eval fuzz-eval-td fuzz-eval-ext fuzz-eval-ext-td fuzz-entity-val fuzz-request-val fuzz-level-val fuzz-auth-td fuzz-val-td fuzz-batch fuzz-batch-drt fuzz-roundtrip fuzz-proto-roundtrip fuzz-rbac fuzz-rbac-authorizer fuzz-val-pbt fuzz-val-pbt-td fuzz-wildcard fuzz-partial-eval fuzz-partial-eval-pbt fuzz-policy-cedar-to-json fuzz-policy-json-to-cedar fuzz-tpe-query-principal fuzz-tpe-query-resource fuzz-tpe-query-action fuzz-entity-slicing fuzz-schema-resolution fuzz-input-generation fuzz-parser-crash fuzz-schema-parser fuzz-schema-wf fuzz-schema-wf-td fuzz-forbid-trumps fuzz-default-deny fuzz-order-dup fuzz-denied-iff fuzz-add-permit fuzz-add-forbid fuzz-det-err-disjoint fuzz-unchanged-det fuzz-unchanged-err fuzz-error-irrel fuzz-rm-forbid fuzz-rm-permit fuzz-decomp fuzz-tpe-drt fuzz-tpe-soundness fuzz-tpe-reauth fuzz-symcc-never-errors fuzz-symcc-always-matches fuzz-symcc-never-matches fuzz-symcc-always-allows fuzz-symcc-always-denies fuzz-symcc-matches-equiv fuzz-symcc-matches-implies fuzz-symcc-matches-disjoint fuzz-symcc-equiv fuzz-symcc-implies fuzz-symcc-disjoint fuzz-symcc-withcex fuzz-symcc-all corpus corpus-from-drt corpus-full corpus-expanded corpus-validation corpus-validation-expanded clean help
 
 all: proto build
 
@@ -672,6 +672,42 @@ fuzz-unchanged-err: proto
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(SMT_ENV) \
 	go test -fuzz=FuzzUnchangedErroringWhenAddPolicy -fuzztime=2m ./fuzz/
+
+## fuzz-error-irrel: Run error_irrelevance theorem fuzzing
+## Tests that erroring policies never influence the authorization decision
+fuzz-error-irrel: proto
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(SMT_ENV) \
+	go test -fuzz=FuzzErrorIrrelevance -fuzztime=2m ./fuzz/
+
+## fuzz-rm-forbid: Run removing_forbid_preserves_allow theorem fuzzing
+## Tests that removing a forbid policy can never flip Allow to Deny
+fuzz-rm-forbid: proto
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(SMT_ENV) \
+	go test -fuzz=FuzzRemovingForbidPreservesAllow -fuzztime=2m ./fuzz/
+
+## fuzz-rm-permit: Run removing_permit_preserves_deny theorem fuzzing
+## Tests that removing a permit policy can never flip Deny to Allow
+fuzz-rm-permit: proto
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(SMT_ENV) \
+	go test -fuzz=FuzzRemovingPermitPreservesDeny -fuzztime=2m ./fuzz/
+
+## fuzz-decomp: Run decision_decomposition theorem fuzzing
+## Tests that decisions depend only on (∃ satisfied forbid, ∃ satisfied permit)
+fuzz-decomp: proto
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(SMT_ENV) \
+	go test -fuzz=FuzzDecisionDecomposition -fuzztime=2m ./fuzz/
 
 ## fuzz-tpe-drt: Run TPE DRT (compares cedar-go batch evaluation against Lean TPE)
 fuzz-tpe-drt: proto
