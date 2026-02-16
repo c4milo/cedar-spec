@@ -24,7 +24,8 @@ extern void lean_finalize_thread(void);
 extern void lean_io_mark_end_initialization(void);
 
 // CedarFFI initialization function
-extern lean_object* initialize_CedarFFI(uint8_t builtin, lean_object* ob);
+// As of Lean 4.27.0 / Lake, the init symbol is prefixed with the package name
+extern lean_object* initialize_Cedar_CedarFFI_Main(uint8_t builtin, lean_object* ob);
 */
 import "C"
 
@@ -71,7 +72,7 @@ func Initialize() error {
 		// Initialize CedarFFI module
 		// builtin=1 indicates this is a builtin module initialization
 		world := C.lean_io_mk_world()
-		res := C.initialize_CedarFFI(1, world)
+		res := C.initialize_Cedar_CedarFFI_Main(1, world)
 
 		if C.lean_io_result_is_ok(res) {
 			C.lean_dec_ref(res)

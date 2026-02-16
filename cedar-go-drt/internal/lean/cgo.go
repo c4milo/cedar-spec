@@ -33,7 +33,7 @@ extern lean_object* levelValidate(lean_object* req);
 extern lean_object* validateEntities(lean_object* req);
 extern lean_object* validateRequest(lean_object* req);
 extern lean_object* checkEvaluate(lean_object* req);
-extern lean_object* initialize_CedarFFI(uint8_t builtin, lean_object* ob);
+extern lean_object* initialize_Cedar_CedarFFI_Main(uint8_t builtin, lean_object* ob);
 
 // Helper to check if Lean IO result is OK
 static inline int lean_io_is_ok(lean_object* o) {

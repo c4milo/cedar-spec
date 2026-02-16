@@ -22,7 +22,9 @@ CEDAR_PROTO_DIR := $(CEDAR_REPO)/cedar-policy/protobuf_schema
 PROTO_OUT_DIR := internal/proto/pb
 
 # Lean library names (in dependency order: most dependent first)
-LEAN_LIBS := CedarFFI CedarProto Cedar Cedar_SymCC Protobuf
+# As of Lean 4.27.0 / Lake, static libs are prefixed with the package name:
+# e.g., libCedar_CedarFFI.a instead of libCedarFFI.a
+LEAN_LIBS := Cedar_CedarFFI Cedar_CedarProto Cedar_Cedar Cedar_Cedar_SymCC Cedar_Protobuf
 
 # Additional library directories
 BATTERIES_BUILD_DIR := $(LEAN_DIR)/.lake/packages/batteries/.lake/build/lib
@@ -37,7 +39,7 @@ CGO_COMPILE_FLAGS := -I$(LEAN_SYSROOT)/include
 # CGO link flags - order matters for static libraries
 # Include rpath flags for macOS dynamic library loading
 CGO_LINK_FLAGS := -L$(LEAN_BUILD_DIR) $(addprefix -l,$(LEAN_LIBS)) \
-	-L$(BATTERIES_BUILD_DIR) -lBatteries \
+	-L$(BATTERIES_BUILD_DIR) -lbatteries_Batteries \
 	-L$(LEAN_SYSROOT)/lib/lean -lleanshared \
 	-Wl,-rpath,$(LEAN_SYSROOT)/lib/lean \
 	-Wl,-rpath,$(CURDIR)/$(LEAN_BUILD_DIR) \
