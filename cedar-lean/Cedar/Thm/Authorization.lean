@@ -273,4 +273,90 @@ theorem determining_erroring_disjoint_when_unique_ids (request : Request) (entit
   have : ¬satisfied _ request entities := l₁ _ h₂
   contradiction
 
+/--
+Error irrelevance: adding an erroring policy does not change the authorization decision.
+An erroring policy is not satisfied (since `satisfied` requires `.ok true` but errors
+return `.error`), so it cannot appear in `satisfiedPolicies`, and thus cannot affect
+the decision.
+-/
+theorem error_irrelevance (request : Request) (entities : Entities) (policies : Policies) (policy₀ : Policy) :
+  hasError policy₀ request entities →
+  (isAuthorized request entities policies).decision = (isAuthorized request entities (policy₀ :: policies)).decision
+:= by
+  intro h_err
+  have h_not_sat : satisfied policy₀ request entities = false := by
+    have ⟨err, h_eval⟩ := if_hasError_then_exists_error h_err
+    simp [satisfied, h_eval]
+  have h_eq : ∀ effect, satisfiedPolicies effect (policy₀ :: policies) request entities =
+                        satisfiedPolicies effect policies request entities := by
+    intro effect
+    unfold satisfiedPolicies
+    simp [satisfiedWithEffect, h_not_sat]
+  unfold isAuthorized
+  simp only [h_eq]
+  split <;> simp_all
+
+/--
+Removing a forbid policy preserves an Allow decision.
+If the decision is Allow with a forbid policy present, that forbid was not satisfied
+(otherwise `forbid_trumps_permit` would apply), and permits are unaffected by removing
+a forbid.
+-/
+theorem removing_forbid_preserves_allow (request : Request) (entities : Entities) (policies : Policies) (policy₀ : Policy) :
+  policy₀.effect = .forbid →
+  (isAuthorized request entities (policy₀ :: policies)).decision = .allow →
+  (isAuthorized request entities policies).decision = .allow
+:= by
+  intro h₁ h₂
+  rw [← allowed_iff_explicitly_permitted_and_not_denied] at h₂ ⊢
+  obtain ⟨h_permit, h_no_forbid⟩ := h₂
+  unfold IsExplicitlyPermitted IsExplicitlyForbidden HasSatisfiedEffect at *
+  constructor
+  · obtain ⟨p, h_mem, h_eff, h_sat⟩ := h_permit
+    rcases List.mem_cons.mp h_mem with rfl | h_mem
+    · simp [h₁] at h_eff
+    · exact ⟨p, h_mem, h_eff, h_sat⟩
+  · intro ⟨p, h_mem, h_eff, h_sat⟩
+    exact h_no_forbid ⟨p, List.mem_cons.mpr (Or.inr h_mem), h_eff, h_sat⟩
+
+/--
+Removing a permit policy preserves a Deny decision.
+If the decision is Deny with a permit policy present, either there is a satisfied forbid
+(still present after removal) or no permit is satisfied (fewer permits after removal).
+-/
+theorem removing_permit_preserves_deny (request : Request) (entities : Entities) (policies : Policies) (policy₀ : Policy) :
+  policy₀.effect = .permit →
+  (isAuthorized request entities (policy₀ :: policies)).decision = .deny →
+  (isAuthorized request entities policies).decision = .deny
+:= by
+  intro h₁ h₂
+  rw [← denied_iff_explicitly_denied_or_not_permitted] at h₂ ⊢
+  unfold IsExplicitlyPermitted IsExplicitlyForbidden HasSatisfiedEffect at *
+  rcases h₂ with ⟨p, h_mem, h_eff, h_sat⟩ | h_no_permit
+  · left
+    rcases List.mem_cons.mp h_mem with rfl | h_mem
+    · simp [h₁] at h_eff
+    · exact ⟨p, h_mem, h_eff, h_sat⟩
+  · right
+    intro ⟨p, h_mem, h_eff, h_sat⟩
+    exact h_no_permit ⟨p, List.mem_cons.mpr (Or.inr h_mem), h_eff, h_sat⟩
+
+/--
+Decision decomposition: the authorization decision depends only on whether there exist
+satisfied forbid policies and whether there exist satisfied permit policies.
+Two policy sets that agree on these two properties produce the same decision.
+-/
+theorem decision_decomposition (request : Request) (entities : Entities) (policies₁ policies₂ : Policies) :
+  (satisfiedPolicies .forbid policies₁ request entities).isEmpty =
+  (satisfiedPolicies .forbid policies₂ request entities).isEmpty →
+  (satisfiedPolicies .permit policies₁ request entities).isEmpty =
+  (satisfiedPolicies .permit policies₂ request entities).isEmpty →
+  (isAuthorized request entities policies₁).decision =
+  (isAuthorized request entities policies₂).decision
+:= by
+  intro h_forbid h_permit
+  unfold isAuthorized
+  simp only [h_forbid, h_permit]
+  split <;> simp_all
+
 end Cedar.Thm
