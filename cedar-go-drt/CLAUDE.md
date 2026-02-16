@@ -110,7 +110,7 @@ Compares cedar-go vs Lean results:
 - `CompareValidation()` - Valid/invalid with error messages
 - `CheckTypeSoundness()` - If cedar-go accepts, Lean must too
 
-## Fuzz Targets (79 total)
+## Fuzz Targets (83 total)
 
 ### Authorization Theorems (No Lean Required) ⚡
 Property-based tests verifying Lean authorization theorems:
@@ -129,6 +129,15 @@ Property-based tests verifying Lean authorization theorems:
 | `fuzz-rm-forbid` | `removing_forbid_preserves_allow` - removing forbid can't flip Allow to Deny |
 | `fuzz-rm-permit` | `removing_permit_preserves_deny` - removing permit can't flip Deny to Allow |
 | `fuzz-decomp` | `decision_decomposition` - decision depends only on (∃ forbid, ∃ permit) |
+
+### Authorization Theorem DRT (Lean Required)
+Theorem property tests that also compare cedar-go against Lean on every authorization call:
+| Make Target | Purpose |
+|-------------|---------|
+| `fuzz-error-irrel-drt` | `error_irrelevance` - theorem + Lean comparison |
+| `fuzz-rm-forbid-drt` | `removing_forbid_preserves_allow` - theorem + Lean comparison |
+| `fuzz-rm-permit-drt` | `removing_permit_preserves_deny` - theorem + Lean comparison |
+| `fuzz-decomp-drt` | `decision_decomposition` - theorem + Lean comparison |
 
 ### Authorization (Lean Required)
 | Make Target | Purpose |
@@ -302,7 +311,7 @@ The **strict validation mode** (`fuzz-val-strict`) catches:
 8. **unchanged_determining_when_add_policy**: Determining policies preserved when decision unchanged
 9. **unchanged_erroring_when_add_policy**: Erroring policies preserved when adding any policy
 
-### Proposed Authorization Theorems (not yet in Lean formalization)
+### Additional Authorization Theorems (proven in Lean formalization)
 10. **error_irrelevance**: Erroring policies never influence the authorization decision
 11. **removing_forbid_preserves_allow**: Removing a forbid can't flip Allow to Deny
 12. **removing_permit_preserves_deny**: Removing a permit can't flip Deny to Allow
