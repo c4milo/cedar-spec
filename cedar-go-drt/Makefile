@@ -77,7 +77,7 @@ SYMCC_FUZZTIME ?= 2m
 FUZZ_PARALLEL ?=
 FUZZ_PARALLEL_FLAG := $(if $(FUZZ_PARALLEL),-parallel=$(FUZZ_PARALLEL))
 
-.PHONY: all lean proto build test test-fuzz test-symcc lint deadcode fmt fuzz-auth fuzz-val fuzz-val-strict fuzz-eval fuzz-eval-td fuzz-eval-ext fuzz-eval-ext-td fuzz-entity-val fuzz-request-val fuzz-level-val fuzz-auth-td fuzz-val-td fuzz-batch fuzz-batch-drt fuzz-roundtrip fuzz-proto-roundtrip fuzz-rbac fuzz-rbac-authorizer fuzz-val-pbt fuzz-val-pbt-td fuzz-wildcard fuzz-partial-eval fuzz-partial-eval-pbt fuzz-policy-cedar-to-json fuzz-policy-json-to-cedar fuzz-tpe-query-principal fuzz-tpe-query-resource fuzz-tpe-query-action fuzz-entity-slicing fuzz-schema-resolution fuzz-input-generation fuzz-parser-crash fuzz-schema-parser fuzz-schema-wf fuzz-schema-wf-td fuzz-forbid-trumps fuzz-default-deny fuzz-order-dup fuzz-denied-iff fuzz-add-permit fuzz-add-forbid fuzz-det-err-disjoint fuzz-unchanged-det fuzz-unchanged-err fuzz-error-irrel fuzz-rm-forbid fuzz-rm-permit fuzz-decomp fuzz-error-irrel-drt fuzz-rm-forbid-drt fuzz-rm-permit-drt fuzz-decomp-drt fuzz-tpe-drt fuzz-tpe-soundness fuzz-tpe-reauth fuzz-symcc-never-errors fuzz-symcc-always-matches fuzz-symcc-never-matches fuzz-symcc-always-allows fuzz-symcc-always-denies fuzz-symcc-matches-equiv fuzz-symcc-matches-implies fuzz-symcc-matches-disjoint fuzz-symcc-equiv fuzz-symcc-implies fuzz-symcc-disjoint fuzz-symcc-withcex fuzz-symcc-all corpus corpus-from-drt corpus-full corpus-expanded corpus-validation corpus-validation-expanded clean help
+.PHONY: all lean proto build test test-fuzz test-symcc lint deadcode fmt fuzz-auth fuzz-val fuzz-val-strict fuzz-eval fuzz-eval-td fuzz-eval-ext fuzz-eval-ext-td fuzz-entity-val fuzz-request-val fuzz-level-val fuzz-auth-td fuzz-val-td fuzz-batch fuzz-batch-drt fuzz-roundtrip fuzz-proto-roundtrip fuzz-rbac fuzz-rbac-authorizer fuzz-val-pbt fuzz-val-pbt-td fuzz-wildcard fuzz-partial-eval fuzz-partial-eval-pbt fuzz-policy-cedar-to-json fuzz-policy-json-to-cedar fuzz-tpe-query-principal fuzz-tpe-query-resource fuzz-tpe-query-action fuzz-entity-slicing fuzz-schema-resolution fuzz-input-generation fuzz-parser-crash fuzz-schema-parser fuzz-schema-wf fuzz-schema-wf-td fuzz-forbid-trumps fuzz-default-deny fuzz-order-dup fuzz-denied-iff fuzz-add-permit fuzz-add-forbid fuzz-det-err-disjoint fuzz-unchanged-det fuzz-unchanged-err fuzz-error-irrel fuzz-rm-forbid fuzz-rm-permit fuzz-decomp fuzz-error-irrel-drt fuzz-rm-forbid-drt fuzz-rm-permit-drt fuzz-decomp-drt fuzz-tpe-drt fuzz-tpe-soundness fuzz-tpe-reauth fuzz-swarm-auth fuzz-swarm-val fuzz-symcc-never-errors fuzz-symcc-always-matches fuzz-symcc-never-matches fuzz-symcc-always-allows fuzz-symcc-always-denies fuzz-symcc-matches-equiv fuzz-symcc-matches-implies fuzz-symcc-matches-disjoint fuzz-symcc-equiv fuzz-symcc-implies fuzz-symcc-disjoint fuzz-symcc-withcex fuzz-symcc-all corpus corpus-from-drt corpus-full corpus-expanded corpus-validation corpus-validation-expanded clean help
 
 all: proto build
 
@@ -776,6 +776,26 @@ fuzz-tpe-reauth: proto
 	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
 	$(SMT_ENV) \
 	go test -fuzz=FuzzTPEResidualReauthorize -fuzztime=5m ./fuzz/
+
+## fuzz-swarm-auth: Run swarm testing authorization fuzzing (Groce et al., ISSTA 2012)
+## Each iteration randomly enables/disables Cedar features to explore diverse configurations
+fuzz-swarm-auth: proto
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
+	go test -fuzz=FuzzSwarmAuthorization -fuzztime=5m ./fuzz/
+
+## fuzz-swarm-val: Run swarm testing validation fuzzing (Groce et al., ISSTA 2012)
+## Each iteration randomly enables/disables Cedar features to explore diverse configurations
+fuzz-swarm-val: proto
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="$(CGO_COMPILE_FLAGS)" \
+	CGO_LDFLAGS="$(CGO_LINK_FLAGS)" \
+	$(DYLIB_PATH_VAR)="$(LEAN_BUILD_DIR):$(BATTERIES_BUILD_DIR):$(LEAN_SYSROOT)/lib/lean" \
+	$(SMT_ENV) \
+	go test -fuzz=FuzzSwarmValidation -fuzztime=5m ./fuzz/
 
 ## fuzz-symcc-never-errors: Run SymCC neverErrors fuzzing (requires cvc5)
 ## Tests that policies don't produce evaluation errors

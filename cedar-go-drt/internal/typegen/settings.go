@@ -39,6 +39,11 @@ type Settings struct {
 
 	// MatchTypes ensures generated values match their declared types.
 	MatchTypes bool
+
+	// Swarm holds the per-test swarm configuration. When nil, all features
+	// are enabled (standard generation). When set, features are toggled per
+	// the swarm config following the methodology from Groce et al. (ISSTA 2012).
+	Swarm *SwarmConfig
 }
 
 // DefaultSettings returns the default generation settings.

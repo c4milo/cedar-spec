@@ -104,12 +104,14 @@ func (g *SchemaGenerator) Generate() *GeneratedSchema {
 		Actions:     make(map[string]SchemaAction),
 	}
 
+	swarm := g.settings.Swarm
+
 	// Generate entity types with shapes and memberOf relationships
 	for i, name := range entityTypes {
 		entity := SchemaEntity{}
 
 		// Add memberOf relationships (to types that come before this one)
-		if i > 0 && g.rand.Bool() {
+		if i > 0 && g.rand.Bool() && (swarm == nil || swarm.EnableHierarchy) {
 			numParents := g.rand.IntRange(1, min(i, 2))
 			entity.MemberOfTypes = make([]string, numParents)
 			for j := range numParents {
@@ -140,7 +142,7 @@ func (g *SchemaGenerator) Generate() *GeneratedSchema {
 		action.AppliesTo.ResourceTypes = ChooseN(g.rand, entityTypes, numResources)
 
 		// Optionally add context
-		if g.rand.Bool() {
+		if g.rand.Bool() && (swarm == nil || swarm.EnableContext) {
 			action.AppliesTo.Context = g.generateRecordType(0)
 		}
 
@@ -162,6 +164,7 @@ func (g *SchemaGenerator) generateType(depth int) *SchemaType {
 	}
 
 	// Choose type kind
+	swarm := g.settings.Swarm
 	switch g.rand.Intn(10) {
 	case 0, 1, 2:
 		return &SchemaType{Type: "String"}
@@ -170,9 +173,15 @@ func (g *SchemaGenerator) generateType(depth int) *SchemaType {
 	case 5:
 		return &SchemaType{Type: "Boolean"}
 	case 6:
-		return g.generateSetType(depth)
+		if swarm == nil || swarm.EnableSetTypes {
+			return g.generateSetType(depth)
+		}
+		return g.generatePrimitiveType()
 	case 7:
-		return g.generateRecordType(depth)
+		if swarm == nil || swarm.EnableRecordTypes {
+			return g.generateRecordType(depth)
+		}
+		return g.generatePrimitiveType()
 	case 8:
 		if g.settings.EnableExtensions {
 			return g.generateExtensionType()

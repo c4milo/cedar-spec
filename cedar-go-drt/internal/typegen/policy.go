@@ -56,10 +56,11 @@ func (g *PolicyGenerator) generatePolicyString() string {
 	var sb strings.Builder
 
 	// Effect
-	if g.rand.Bool() {
-		sb.WriteString("permit(\n")
-	} else {
+	swarm := g.settings.Swarm
+	if !g.rand.Bool() && (swarm == nil || swarm.EnableForbid) {
 		sb.WriteString("forbid(\n")
+	} else {
+		sb.WriteString("permit(\n")
 	}
 
 	// Principal scope
@@ -78,15 +79,17 @@ func (g *PolicyGenerator) generatePolicyString() string {
 	sb.WriteString("\n)")
 
 	// Conditions
-	numConditions := g.rand.IntRange(0, 2)
-	for range numConditions {
-		if g.rand.Bool() {
-			sb.WriteString("\nwhen { ")
-		} else {
-			sb.WriteString("\nunless { ")
+	if swarm == nil || swarm.EnableConditions {
+		numConditions := g.rand.IntRange(0, 2)
+		for range numConditions {
+			if g.rand.Bool() {
+				sb.WriteString("\nwhen { ")
+			} else {
+				sb.WriteString("\nunless { ")
+			}
+			g.writeConditionExpr(&sb, 0)
+			sb.WriteString(" }")
 		}
-		g.writeConditionExpr(&sb, 0)
-		sb.WriteString(" }")
 	}
 
 	sb.WriteString(";")
@@ -95,6 +98,7 @@ func (g *PolicyGenerator) generatePolicyString() string {
 }
 
 func (g *PolicyGenerator) writePrincipalScope(sb *strings.Builder) {
+	swarm := g.settings.Swarm
 	switch g.rand.Intn(4) {
 	case 0:
 		// Any principal
@@ -112,7 +116,7 @@ func (g *PolicyGenerator) writePrincipalScope(sb *strings.Builder) {
 		}
 	case 3:
 		// Principal is type
-		if len(g.schema.EntityTypeList) > 0 {
+		if (swarm == nil || swarm.EnableIsChecks) && len(g.schema.EntityTypeList) > 0 {
 			typeName := Choose(g.rand, g.schema.EntityTypeList)
 			fmt.Fprintf(sb, " is %s", typeName)
 		}
@@ -147,6 +151,7 @@ func (g *PolicyGenerator) writeActionScope(sb *strings.Builder) {
 }
 
 func (g *PolicyGenerator) writeResourceScope(sb *strings.Builder) {
+	swarm := g.settings.Swarm
 	switch g.rand.Intn(4) {
 	case 0:
 		// Any resource
@@ -164,7 +169,7 @@ func (g *PolicyGenerator) writeResourceScope(sb *strings.Builder) {
 		}
 	case 3:
 		// Resource is type
-		if len(g.schema.EntityTypeList) > 0 {
+		if (swarm == nil || swarm.EnableIsChecks) && len(g.schema.EntityTypeList) > 0 {
 			typeName := Choose(g.rand, g.schema.EntityTypeList)
 			fmt.Fprintf(sb, " is %s", typeName)
 		}
@@ -177,6 +182,7 @@ func (g *PolicyGenerator) writeConditionExpr(sb *strings.Builder, depth int) {
 		return
 	}
 
+	swarm := g.settings.Swarm
 	switch g.rand.Intn(10) {
 	case 0:
 		sb.WriteString("true")
@@ -184,31 +190,59 @@ func (g *PolicyGenerator) writeConditionExpr(sb *strings.Builder, depth int) {
 		sb.WriteString("false")
 	case 2:
 		// Comparison with principal/resource attribute
-		g.writeAttributeComparison(sb, depth)
+		if swarm == nil || swarm.EnableAttrCompare {
+			g.writeAttributeComparison(sb, depth)
+		} else {
+			sb.WriteString("true")
+		}
 	case 3:
 		// Context attribute access
-		g.writeContextAccess(sb, depth)
+		if swarm == nil || swarm.EnableContextAccess {
+			g.writeContextAccess(sb, depth)
+		} else {
+			sb.WriteString("true")
+		}
 	case 4:
 		// Logical AND
-		g.writeConditionExpr(sb, depth+1)
-		sb.WriteString(" && ")
-		g.writeConditionExpr(sb, depth+1)
+		if swarm == nil || swarm.EnableLogicalOps {
+			g.writeConditionExpr(sb, depth+1)
+			sb.WriteString(" && ")
+			g.writeConditionExpr(sb, depth+1)
+		} else {
+			sb.WriteString("true")
+		}
 	case 5:
 		// Logical OR
-		g.writeConditionExpr(sb, depth+1)
-		sb.WriteString(" || ")
-		g.writeConditionExpr(sb, depth+1)
+		if swarm == nil || swarm.EnableLogicalOps {
+			g.writeConditionExpr(sb, depth+1)
+			sb.WriteString(" || ")
+			g.writeConditionExpr(sb, depth+1)
+		} else {
+			sb.WriteString("true")
+		}
 	case 6:
 		// Negation
-		sb.WriteString("!(")
-		g.writeConditionExpr(sb, depth+1)
-		sb.WriteString(")")
+		if swarm == nil || swarm.EnableNegation {
+			sb.WriteString("!(")
+			g.writeConditionExpr(sb, depth+1)
+			sb.WriteString(")")
+		} else {
+			sb.WriteString("true")
+		}
 	case 7:
 		// Has attribute check
-		g.writeHasCheck(sb)
+		if swarm == nil || swarm.EnableHasChecks {
+			g.writeHasCheck(sb)
+		} else {
+			sb.WriteString("true")
+		}
 	case 8:
 		// In check
-		g.writeInCheck(sb)
+		if swarm == nil || swarm.EnableInChecks {
+			g.writeInCheck(sb)
+		} else {
+			sb.WriteString("true")
+		}
 	default:
 		sb.WriteString("true")
 	}

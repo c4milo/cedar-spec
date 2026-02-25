@@ -21,10 +21,10 @@ import (
 
 // TypeDirectedInput represents a complete type-directed test input.
 type TypeDirectedInput struct {
-	Schema    *GeneratedSchema
-	Entities  *GeneratedEntities
-	Policies  *cedar.PolicySet
-	Requests  []cedar.Request
+	Schema     *GeneratedSchema
+	Entities   *GeneratedEntities
+	Policies   *cedar.PolicySet
+	Requests   []cedar.Request
 	SchemaJSON []byte
 }
 
@@ -41,9 +41,30 @@ func NewInputGenerator(settings Settings) *InputGenerator {
 // Generate creates a complete type-directed input from fuzzer bytes.
 func (g *InputGenerator) Generate(data []byte) (*TypeDirectedInput, error) {
 	r := NewRand(data)
+	return g.generate(g.settings, r)
+}
 
+// GenerateSwarm creates a type-directed input using swarm testing methodology.
+// A fresh SwarmConfig is generated per call (coin-toss per feature), so each
+// fuzz iteration explores a different subset of Cedar language features.
+func (g *InputGenerator) GenerateSwarm(data []byte) (*TypeDirectedInput, error) {
+	r := NewRand(data)
+
+	// Create per-test swarm configuration
+	swarm := NewSwarmConfig(r)
+
+	// Copy settings with swarm config applied
+	settings := g.settings
+	settings.Swarm = swarm
+	settings.EnableExtensions = settings.EnableExtensions && swarm.EnableExtensions
+
+	return g.generate(settings, r)
+}
+
+// generate is the shared implementation for Generate and GenerateSwarm.
+func (g *InputGenerator) generate(settings Settings, r *Rand) (*TypeDirectedInput, error) {
 	// Generate schema
-	schemaGen := NewSchemaGenerator(g.settings, r)
+	schemaGen := NewSchemaGenerator(settings, r)
 	schema := schemaGen.Generate()
 
 	schemaJSON, err := schema.ToJSON()
@@ -58,6 +79,9 @@ func (g *InputGenerator) Generate(data []byte) (*TypeDirectedInput, error) {
 	// Generate policies conforming to schema
 	policyGen := NewPolicyGenerator(schema, entities, r)
 	numPolicies := r.IntRange(1, 3)
+	if settings.Swarm != nil && !settings.Swarm.EnableMultiPolicies {
+		numPolicies = 1
+	}
 	policies, err := policyGen.GeneratePolicySet(numPolicies)
 	if err != nil {
 		return nil, err

@@ -146,6 +146,7 @@ Theorem property tests that also compare cedar-go against Lean on every authoriz
 | `fuzz-auth-td` | Type-directed authorization |
 | `fuzz-rbac` | RBAC role hierarchy |
 | `fuzz-rbac-authorizer` | Abstract policy combinations |
+| `fuzz-swarm-auth` | Swarm testing authorization (feature omission diversity) |
 
 ### Validation (Lean Required)
 | Make Target | Purpose |
@@ -157,6 +158,7 @@ Theorem property tests that also compare cedar-go against Lean on every authoriz
 | `fuzz-entity-val` | Entity validation |
 | `fuzz-request-val` | Request validation |
 | `fuzz-level-val` | Level-based validation |
+| `fuzz-swarm-val` | Swarm testing validation (feature omission diversity) |
 
 ### Schema Well-Formedness (Lean Required)
 | Make Target | Purpose |
