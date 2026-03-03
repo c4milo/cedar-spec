@@ -117,7 +117,7 @@ type jsonType struct {
 
 type jsonAttribute struct {
 	Type       string                    `json:"type"`
-	Required   bool                      `json:"required"`
+	Required   *bool                     `json:"required,omitempty"`
 	Element    *jsonType                 `json:"element,omitempty"`
 	Name       string                    `json:"name,omitempty"`
 	Attributes map[string]*jsonAttribute `json:"attributes,omitempty"`
@@ -291,9 +291,11 @@ func populateActionAppliesTo(actionDecl *validator.ActionDecl, nsName string, ap
 
 // convertAttributeType converts a JSON attribute to protobuf AttributeType.
 func convertAttributeType(attr *jsonAttribute, nsName string) *validator.AttributeType {
+	// Cedar JSON schema spec: absent "required" field means required (true).
+	isRequired := attr.Required == nil || *attr.Required
 	return &validator.AttributeType{
 		AttrType:   convertJSONTypeToProto(attr, nsName),
-		IsRequired: attr.Required,
+		IsRequired: isRequired,
 	}
 }
 
@@ -347,6 +349,12 @@ func convertJSONTypeToProto(attr *jsonAttribute, nsName string) *validator.Type 
 		return &validator.Type{
 			Data: &validator.Type_Entity{
 				Entity: convertEntityType(types.EntityType(entityName)),
+			},
+		}
+	case "Extension":
+		return &validator.Type{
+			Data: &validator.Type_Ext{
+				Ext: &core.Name{Id: attr.Name},
 			},
 		}
 	default:
